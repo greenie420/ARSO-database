@@ -1,0 +1,50 @@
+name: Consolidate previous day (optional)
+
+# This workflow is entirely optional -- see scripts/consolidate_day.py for
+# the rationale. Delete this file if you'd rather keep every frame as a
+# loose WebP forever (simpler, more storage, fully browsable by URL).
+#
+# Runs once a day, well after midnight UTC, so "yesterday" is fully closed
+# out and fetch_and_process.py is done appending to it.
+
+on:
+  schedule:
+    - cron: "15 0 * * *" # 00:15 UTC daily
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Specific day to consolidate (YYYY-MM-DD). Leave blank for yesterday."
+        required: false
+
+concurrency:
+  group: fetch-radar # shares the group with fetch-radar.yml so they never race on a commit
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  consolidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ffmpeg ships preinstalled on GitHub-hosted ubuntu-latest runners.
+
+      - name: Consolidate
+        run: python scripts/consolidate_day.py ${{ github.event.inputs.date }}
+
+      - name: Commit consolidated video, if any
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "radar: consolidate day into video [skip ci]"
+          file_pattern: "data/**"
+          commit_user_name: "radar-bot"
+          commit_user_email: "actions@users.noreply.github.com"
