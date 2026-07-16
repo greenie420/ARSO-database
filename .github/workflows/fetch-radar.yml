@@ -2,12 +2,13 @@ name: Fetch ARSO radar frames
 
 on:
   schedule:
-    - cron: "*/15 * * * *"   # every 15 minutes
+    # Every 15 minutes
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}
 
 concurrency:
   group: fetch-radar
-  cancel-in-progress: false   # queue up, don't overlap
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -36,10 +37,10 @@ jobs:
       - name: Fetch + process
         run: python scripts/fetch_and_process.py
 
-      - name: Commit new data, if any
+      - name: Commit new frames, if any
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "radar: update frames & animation [skip ci]"
+          commit_message: "radar: add new frame(s) [skip ci]"
           file_pattern: "data/**"
           commit_user_name: "radar-bot"
           commit_user_email: "actions@users.noreply.github.com"

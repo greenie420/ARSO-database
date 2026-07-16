@@ -9,15 +9,17 @@ name: Consolidate previous day (optional)
 
 on:
   schedule:
-    - cron: "0 3 * * *" # 3:00 UTC daily
+    # 3:00 UTC daily
+    - cron: "0 3 * * *"
+    timezone: "Europe/Ljubljana"
   workflow_dispatch:
     inputs:
-      date:
-        description: "Specific day to consolidate (YYYY-MM-DD). Leave blank for yesterday."
+      date:  # kept for future use if you want to target a specific day
+        description: "Not used – always processes all new frames"
         required: false
 
 concurrency:
-  group: fetch-radar # shares the group with fetch-radar.yml so they never race on a commit
+  group: fetch-radar
   cancel-in-progress: false
 
 permissions:
@@ -35,16 +37,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: scripts/requirements.txt
 
-      # ffmpeg ships preinstalled on GitHub-hosted ubuntu-latest runners.
+      - name: Install Python deps
+        run: pip install -r scripts/requirements.txt
 
-      - name: Consolidate
-        run: python scripts/consolidate_day.py ${{ github.event.inputs.date }}
+      - name: Consolidate animation
+        run: python scripts/consolidate_day.py
 
-      - name: Commit consolidated video, if any
+      - name: Commit updated animation & state
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "radar: consolidate day into video [skip ci]"
-          file_pattern: "data/**"
+          commit_message: "radar: daily animation update [skip ci]"
+          file_pattern: |
+            data/animation/**
+            data/state/**
           commit_user_name: "radar-bot"
           commit_user_email: "actions@users.noreply.github.com"

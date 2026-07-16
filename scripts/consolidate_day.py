@@ -27,7 +27,7 @@ INDEX_DIR = REPO_ROOT / "data" / "index"
 ANIMATION_DIR = REPO_ROOT / "data" / "animation"
 AVAILABLE_DAYS_FILE = INDEX_DIR / "available-days.json"
 
-FRAME_DURATION_MS = 250       # 4 frames per second
+FRAME_DURATION_MS = 200       # 5 frames per second
 WEBP_LOSSLESS = True
 WEBP_METHOD = 6               # slowest / best compression
 
