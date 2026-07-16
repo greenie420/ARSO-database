@@ -3,6 +3,7 @@ name: Fetch ARSO radar frames
 on:
   schedule:
     - cron: "*/15 * * * *" # Every 15 minutes
+      timezone: "Europe/Ljubljana"
   workflow_dispatch: {}
 
 concurrency:

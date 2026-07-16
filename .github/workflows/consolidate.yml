@@ -10,7 +10,7 @@ name: Consolidate previous day (optional)
 on:
   schedule:
     - cron: "0 3 * * *" # 3:00 UTC daily
-    timezone: "Europe/Ljubljana"
+      timezone: "Europe/Ljubljana"
   workflow_dispatch:
     inputs:
       date:  # kept for future use if you want to target a specific day
