@@ -1,28 +1,13 @@
 name: Fetch ARSO radar frames
 
 on:
-  # Two schedules 90 minutes apart, alternating, is the standard trick for
-  # a clean "every 90 minutes" cadence in cron (a single expression can't
-  # express a 90-minute period since it doesn't divide an hour evenly).
-  # Together these fire at :00 every 3rd hour and :30 on the hours between,
-  # i.e. 00:00, 01:30, 03:00, 04:30, ... every 90 minutes, all day.
-  #
-  # Why 90 minutes is fine here: the GIF holds 23 frames at 5-minute
-  # spacing, i.e. ~110 minutes of coverage per fetch -- about 20 minutes
-  # more than the gap between runs. Combined with the unchanged-file retry
-  # loop inside fetch_and_process.py, that's enough slack to absorb normal
-  # GitHub Actions scheduling jitter without losing frames. If you want
-  # extra margin anyway (e.g. because your repo is on a very busy runner
-  # queue), switch to hourly by replacing both lines below with a single
-  # `- cron: "5 * * * *"`.
   schedule:
-    - cron: "0 0,3,6,9,12,15,18,21 * * *"
-    - cron: "30 1,4,7,10,13,16,19,22 * * *"
-  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
+    - cron: "*/5 * * * *"   # every 5 minutes on the round marks
+  workflow_dispatch: {}
 
 concurrency:
   group: fetch-radar
-  cancel-in-progress: false # queue instead of overlapping; a run can take up to ~15 min via its own retry loop
+  cancel-in-progress: false   # queue up, don't overlap
 
 permissions:
   contents: write
@@ -30,7 +15,7 @@ permissions:
 jobs:
   fetch:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,10 +36,10 @@ jobs:
       - name: Fetch + process
         run: python scripts/fetch_and_process.py
 
-      - name: Commit new frames, if any
+      - name: Commit new data, if any
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "radar: add new frame(s) [skip ci]"
+          commit_message: "radar: update frames & animation [skip ci]"
           file_pattern: "data/**"
           commit_user_name: "radar-bot"
           commit_user_email: "actions@users.noreply.github.com"

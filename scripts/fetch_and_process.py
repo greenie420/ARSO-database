@@ -1,27 +1,11 @@
 #!/usr/bin/env python3
 """
-ARSO rain-radar timelapse collector.
+ARSO rain-radar frame collector – per‑frame saving only.
 
-What this does, once per run:
-  1. Fetch the animated GIF from ARSO.
-  2. If it's byte-identical to what we saw last time, wait a bit and retry
-     (a few times) instead of giving up immediately -- ARSO doesn't always
-     refresh exactly on schedule.
-  3. Once we have a genuinely new GIF, walk every frame (not just the last
-     one), OCR the timestamp burned into each frame, and save ONLY the
-     frames whose timestamp we don't already have on disk.
-  4. Update a small per-day JSON index so the frontend can ask "what frames
-     exist for 2026-07-14?" without ever loading the whole archive.
-
-Why per-frame dedup instead of "concatenate + recompress the whole archive
-every run": each fetch mostly overlaps the previous one (same ~110 minutes
-of radar, shifted a few frames forward). Re-decoding and re-encoding a
-growing blob on every run is O(archive size) work forever. Extracting only
-the handful of frames you haven't seen yet and writing them once, as
-individually addressable files, is O(new frames) work forever -- and it's
-exactly what a "go to this date/time" frontend wants to fetch anyway.
-See README.md for the full rationale and the optional nightly consolidation
-step if you want compact "play the whole day" video files too.
+- First run: extract all unique frames from the GIF, save as individual
+  lossless WebP files, update per‑day indexes.
+- Subsequent runs: fetch the GIF until it changes, extract ONLY the last
+  frame, save it if it doesn't already exist.
 """
 
 from __future__ import annotations
@@ -33,10 +17,10 @@ import logging
 import re
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, date
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 import requests
 from PIL import Image, ImageSequence
@@ -53,157 +37,103 @@ INDEX_DIR = REPO_ROOT / "data" / "index"
 STATE_FILE = REPO_ROOT / "data" / "state" / "latest.json"
 AVAILABLE_DAYS_FILE = INDEX_DIR / "available-days.json"
 
-# --- OCR crop box -----------------------------------------------------------
-# Pixel box (left, top, right, bottom) of the timestamp overlay within a
-# single decoded frame. This is a STARTING GUESS based on the sample corner
-# crop -- calibrate it against a real frame before relying on this in
-# production. Run:
-#   python scripts/fetch_and_process.py --dump-frame 0 --debug-crop-box
-# which saves /tmp/frame_debug.png with the current crop box drawn on it in
-# red, so you can visually check/adjust the numbers below.
 TIMESTAMP_CROP_BOX = (0, 0, 230, 46)
 
-# Retry-if-unchanged behaviour (matches the "every 1.5h, retry every 1 min
-# if nothing changed" spec). See README.md for the scheduling discussion --
-# with 23 frames at 5-minute spacing the GIF covers ~110 minutes, so a
-# 90-minute cron already has slack built in even before these retries.
-RETRY_SLEEP_SECONDS = 60
-MAX_RETRIES = 15  # ~15 minutes of retrying before giving up for this run
+RETRY_SLEEP_SECONDS = 30
+MAX_RETRIES = 12          # 6 minutes total
 
-REQUEST_TIMEOUT = 30
+REQUEST_TIMEOUT = 45
 
-TIMESTAMP_RE = re.compile(r"(\d{4}-\d{2}-\d{2})\D{1,3}(\d{2}:\d{2})\D{0,6}UTC", re.IGNORECASE)
+WEBP_LOSSLESS = True
+WEBP_METHOD = 6
 
-WEBP_QUALITY = 90  # lossless=False, quality=90 is a good size/fidelity tradeoff for radar PNGs
+TIMESTAMP_RE = re.compile(
+    r"(\d{4}-\d{2}-\d{2})\D{1,3}(\d{2}).{0,2}?(\d{2})\D{0,6}UTC",
+    re.IGNORECASE,
+)
+
+SAVE_OCR_DEBUG_IMAGES = False
+DEBUG_OCR_IMAGES_DIR = Path("test/_ocr_debug")
+_ocr_debug_counter = 0
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("radar")
 
 
 # --------------------------------------------------------------------------
+# State (shared with consolidation script – keep it a plain dict)
+# --------------------------------------------------------------------------
+
+def load_state() -> dict:
+    if STATE_FILE.exists():
+        return json.loads(STATE_FILE.read_text())
+    return {"last_gif_md5": None, "latest_frame_ts": None}
+
+def save_state(state: dict) -> None:
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATE_FILE.write_text(json.dumps(state, indent=2))
+
+
+# --------------------------------------------------------------------------
 # HTTP fetch
 # --------------------------------------------------------------------------
 
-@dataclass
-class FetchState:
-    etag: Optional[str] = None
-    last_modified: Optional[str] = None
-    last_gif_md5: Optional[str] = None
-    latest_frame_ts: Optional[str] = None  # e.g. "2026-07-14 15:05 UTC"
-
-
-def load_state() -> FetchState:
-    if STATE_FILE.exists():
-        data = json.loads(STATE_FILE.read_text())
-        return FetchState(**data)
-    return FetchState()
-
-
-def save_state(state: FetchState) -> None:
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state.__dict__, indent=2))
-
-
-def fetch_gif(state: FetchState) -> tuple[Optional[bytes], FetchState]:
-    """GET the GIF. Uses conditional headers when the server supports them
-    so an "unchanged" check is cheap; falls back to a content hash
-    comparison otherwise (ARSO's server doesn't reliably send validators for
-    this endpoint, so treat conditional headers as a nice-to-have, not the
-    only line of defense)."""
-    headers = {}
-    if state.etag:
-        headers["If-None-Match"] = state.etag
-    if state.last_modified:
-        headers["If-Modified-Since"] = state.last_modified
-
-    resp = requests.get(GIF_URL, headers=headers, timeout=REQUEST_TIMEOUT)
+def fetch_gif(last_md5: Optional[str]) -> Optional[tuple[bytes, str]]:
+    resp = requests.get(GIF_URL, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
-
-    if resp.status_code == 304:
-        return None, state  # server confirms: unchanged
-
     content = resp.content
     md5 = hashlib.md5(content).hexdigest()
-
-    new_state = FetchState(
-        etag=resp.headers.get("ETag", state.etag),
-        last_modified=resp.headers.get("Last-Modified", state.last_modified),
-        last_gif_md5=md5,
-        latest_frame_ts=state.latest_frame_ts,
-    )
-
-    if md5 == state.last_gif_md5:
-        return None, new_state  # byte-identical to last time we looked
-
-    return content, new_state
+    if md5 == last_md5:
+        return None
+    return content, md5
 
 
 # --------------------------------------------------------------------------
 # Frame extraction + OCR
 # --------------------------------------------------------------------------
 
-def extract_frames(gif_bytes: bytes) -> list[Image.Image]:
-    """Return every frame of the GIF as a fully-composited RGB image, in
-    playback order. Uses ImageSequence so GIF disposal handling is done by
-    Pillow rather than by us re-implementing frame compositing."""
-    im = Image.open(io.BytesIO(gif_bytes))
-    frames = [frame.convert("RGB") for frame in ImageSequence.Iterator(im)]
-    return frames
-
-
-def _preprocess_for_ocr(crop: Image.Image) -> Image.Image:
-    gray = crop.convert("L")
-    gray = gray.resize((gray.width * 3, gray.height * 3), Image.LANCZOS)
-    # Simple binarization. The overlay in the sample is dark text on a
-    # light box, which this threshold handles; if ARSO changes the overlay
-    # style you may need an adaptive threshold instead (see README).
-    return gray.point(lambda p: 255 if p > 140 else 0)
-
-
-def ocr_timestamp(frame: Image.Image) -> Optional[str]:
-    """Crop the overlay region, OCR it, and parse a timestamp like
-    '2026-07-14 15:05 UTC'. Returns None if nothing usable was read."""
-    import pytesseract  # imported here so --help works even if tesseract isn't installed
-
-    crop = frame.crop(TIMESTAMP_CROP_BOX)
-    processed = _preprocess_for_ocr(crop)
-    text = pytesseract.image_to_string(
-        processed,
-        config="--psm 6 -c tessedit_char_whitelist='ARSOIDUTC0123456789:- '",
-    )
-    match = TIMESTAMP_RE.search(text.replace("\n", " "))
-    if not match:
-        log.warning("OCR could not parse a timestamp from frame (raw: %r)", text.strip())
-        return None
-    date_part, time_part = match.groups()
-    return f"{date_part} {time_part} UTC"
-
-
 @dataclass
 class ParsedFrame:
     dt: datetime
     image: Image.Image
 
+def extract_frames(gif_bytes: bytes) -> List[Image.Image]:
+    im = Image.open(io.BytesIO(gif_bytes))
+    return [frame.convert("RGB") for frame in ImageSequence.Iterator(im)]
 
-def parse_all_frames(gif_bytes: bytes) -> list[ParsedFrame]:
-    parsed: list[ParsedFrame] = []
-    for frame in extract_frames(gif_bytes):
-        ts = ocr_timestamp(frame)
-        if ts is None:
-            continue
-        dt = datetime.strptime(ts, "%Y-%m-%d %H:%M UTC")
-        parsed.append(ParsedFrame(dt=dt, image=frame))
-    parsed.sort(key=lambda p: p.dt)  # don't trust playback order, trust the OCR'd clock
-    return parsed
+def _preprocess_for_ocr(crop: Image.Image) -> Image.Image:
+    gray = crop.convert("L")
+    gray = gray.resize((gray.width * 3, gray.height * 3), Image.LANCZOS)
+    return gray.point(lambda p: 255 if p > 140 else 0)
+
+def ocr_timestamp(frame: Image.Image) -> Optional[str]:
+    import pytesseract
+    crop = frame.crop(TIMESTAMP_CROP_BOX)
+    processed = _preprocess_for_ocr(crop)
+
+    if SAVE_OCR_DEBUG_IMAGES:
+        global _ocr_debug_counter
+        DEBUG_OCR_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        debug_path = DEBUG_OCR_IMAGES_DIR / f"frame_{_ocr_debug_counter:03d}.png"
+        processed.save(debug_path)
+        log.info("OCR debug image #%d -> %s", _ocr_debug_counter, debug_path)
+        _ocr_debug_counter += 1
+
+    text = pytesseract.image_to_string(processed, config="--psm 6")
+    match = TIMESTAMP_RE.search(text.replace("\n", " "))
+    if not match:
+        log.warning("OCR could not parse timestamp (raw: %r)", text.strip())
+        return None
+    date_part, hour_part, minute_part = match.groups()
+    return f"{date_part} {hour_part}:{minute_part} UTC"
 
 
 # --------------------------------------------------------------------------
-# Storage: per-day index + individual frame files
+# Per‑frame storage
 # --------------------------------------------------------------------------
 
 def day_index_path(d: date) -> Path:
     return INDEX_DIR / f"{d.isoformat()}.json"
-
 
 def load_day_index(d: date) -> dict:
     p = day_index_path(d)
@@ -211,12 +141,10 @@ def load_day_index(d: date) -> dict:
         return json.loads(p.read_text())
     return {"date": d.isoformat(), "frames": []}
 
-
 def save_day_index(d: date, idx: dict) -> None:
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
     idx["frames"].sort(key=lambda f: f["time"])
     day_index_path(d).write_text(json.dumps(idx, separators=(",", ":")))
-
 
 def mark_day_available(d: date) -> None:
     AVAILABLE_DAYS_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -229,29 +157,28 @@ def mark_day_available(d: date) -> None:
         days.sort()
         AVAILABLE_DAYS_FILE.write_text(json.dumps({"days": days}, separators=(",", ":")))
 
-
 def frame_file_path(dt: datetime) -> Path:
-    return FRAMES_DIR / f"{dt:%Y}" / f"{dt:%m}" / f"{dt:%d}" / f"{dt:%H%M}.webp"
+    return FRAMES_DIR / f"{dt:%Y}" / f"{dt:%m}" / f"{dt:%d}" / f"{dt:%Hh%Mm}.webp"
 
-
-def save_new_frames(parsed: list[ParsedFrame]) -> int:
-    """Save whichever frames aren't already on disk. Returns count saved."""
+def save_new_frames(parsed_frames: List[ParsedFrame]) -> int:
     saved = 0
     by_day: dict[date, dict] = {}
 
-    for pf in parsed:
+    for pf in parsed_frames:
         d = pf.dt.date()
         if d not in by_day:
             by_day[d] = load_day_index(d)
         idx = by_day[d]
         time_str = f"{pf.dt:%H:%M}"
-        already_have = any(f["time"] == time_str for f in idx["frames"])
-        if already_have:
+        if any(f["time"] == time_str for f in idx["frames"]):
             continue
 
         out_path = frame_file_path(pf.dt)
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        pf.image.save(out_path, "WEBP", quality=WEBP_QUALITY, method=6)
+        if WEBP_LOSSLESS:
+            pf.image.save(out_path, "WEBP", lossless=True, quality=100, method=WEBP_METHOD)
+        else:
+            pf.image.save(out_path, "WEBP", quality=70, method=WEBP_METHOD)
 
         idx["frames"].append({
             "time": time_str,
@@ -271,67 +198,77 @@ def save_new_frames(parsed: list[ParsedFrame]) -> int:
 # Main
 # --------------------------------------------------------------------------
 
-def run_once() -> int:
-    """One fetch-with-retries cycle. Returns number of new frames saved."""
+def run_once() -> bool:
     state = load_state()
+    last_md5 = state["last_gif_md5"]
 
+    # 1. Fetch genuinely new GIF
+    gif_bytes = None
+    new_md5 = None
     for attempt in range(1, MAX_RETRIES + 1):
         log.info("fetch attempt %d/%d", attempt, MAX_RETRIES)
-        gif_bytes, state = fetch_gif(state)
-        save_state(state)  # persist etag/hash progress even if we retry
-
-        if gif_bytes is not None:
+        result = fetch_gif(last_md5)
+        if result is not None:
+            gif_bytes, new_md5 = result
             break
-
         if attempt == MAX_RETRIES:
-            log.info("no change after %d attempts, giving up for this run", MAX_RETRIES)
-            return 0
-
-        log.info("GIF unchanged, retrying in %ds", RETRY_SLEEP_SECONDS)
+            log.info("GIF unchanged after %d attempts, nothing to do", MAX_RETRIES)
+            return False
+        log.info("GIF unchanged, sleeping %ds", RETRY_SLEEP_SECONDS)
         time.sleep(RETRY_SLEEP_SECONDS)
+
+    log.info("got new GIF, MD5=%s", new_md5)
+
+    # 2. Extract frame(s)
+    is_first_run = state["latest_frame_ts"] is None
+
+    if is_first_run:
+        # First run: dump all unique frames
+        frames = extract_frames(gif_bytes)
+        stamped = []
+        seen_ts = set()
+        for f in frames:
+            ts = ocr_timestamp(f)
+            if ts and ts not in seen_ts:
+                seen_ts.add(ts)
+                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M UTC")
+                stamped.append(ParsedFrame(dt=dt, image=f))
+        if not stamped:
+            log.error("no timestamps readable")
+            return False
+        stamped.sort(key=lambda pf: pf.dt)
+        saved = save_new_frames(stamped)
+        latest_ts = stamped[-1].dt.strftime("%Y-%m-%d %H:%M UTC")
+        log.info("first run: saved %d frames, latest=%s", saved, latest_ts)
+
     else:
-        return 0
+        # Consecutive run: only last frame is new
+        all_frames = extract_frames(gif_bytes)
+        if not all_frames:
+            log.error("empty GIF")
+            return False
+        new_frame = all_frames[-1]
+        ts = ocr_timestamp(new_frame)
+        if ts is None:
+            log.warning("OCR failed on last frame, skipping")
+            return False
+        dt = datetime.strptime(ts, "%Y-%m-%d %H:%M UTC")
+        pf = ParsedFrame(dt=dt, image=new_frame)
+        saved = save_new_frames([pf])
+        latest_ts = ts
+        log.info("saved %d frame(s), latest=%s", saved, latest_ts)
 
-    parsed = parse_all_frames(gif_bytes)
-    if not parsed:
-        log.warning("fetched a new GIF but OCR couldn't read any timestamps -- "
-                     "check TIMESTAMP_CROP_BOX, the overlay style may have changed")
-        return 0
-
-    newest = parsed[-1].dt
-    saved = save_new_frames(parsed)
-
-    state.latest_frame_ts = f"{newest:%Y-%m-%d %H:%M} UTC"
+    # 3. Update state (no animation keys touched)
+    state["last_gif_md5"] = new_md5
+    state["latest_frame_ts"] = latest_ts
     save_state(state)
-
-    log.info("done: %d new frame(s) saved, latest is %s", saved, state.latest_frame_ts)
-    return saved
-
-
-def _debug_dump_frame(frame_index: int, draw_crop_box: bool) -> None:
-    """Fetch the current GIF and save one frame to /tmp for visual
-    calibration of TIMESTAMP_CROP_BOX. Doesn't touch stored state."""
-    resp = requests.get(GIF_URL, timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status()
-    frames = extract_frames(resp.content)
-    frame = frames[frame_index]
-    if draw_crop_box:
-        from PIL import ImageDraw
-        frame = frame.copy()
-        ImageDraw.Draw(frame).rectangle(TIMESTAMP_CROP_BOX, outline="red", width=2)
-    out = Path("/tmp/frame_debug.png")
-    frame.save(out)
-    print(f"saved {out} ({len(frames)} frames total in this GIF)")
+    return True
 
 
 if __name__ == "__main__":
     if "--dump-frame" in sys.argv:
         idx = int(sys.argv[sys.argv.index("--dump-frame") + 1])
-        _debug_dump_frame(idx, draw_crop_box="--debug-crop-box" in sys.argv)
+        # debug helper (keep if needed)
         sys.exit(0)
-
-    n = run_once()
-    # Exit code 0 always -- "no new frames this run" is a normal outcome,
-    # not a failure. The workflow step after this checks `git status` to
-    # decide whether there's anything to commit.
+    run_once()
     sys.exit(0)

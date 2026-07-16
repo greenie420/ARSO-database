@@ -1,101 +1,167 @@
 #!/usr/bin/env python3
 """
-Optional storage housekeeping: pack one day's individually-saved frames into
-a single compact WebM (VP9) file, then remove the loose per-frame files.
+Nightly housekeeping: build one lossless WebP animation per day from the
+individual frame files, then record the completed animation in the day
+index so the frontend can switch to video-based playback.
 
-Why this is optional and separate from fetch_and_process.py:
-  - The frontend's "jump to a specific date/time" feature works directly off
-    the loose WebP frames + the day's JSON index. That's the source of
-    truth and needs no video decoding.
-  - Loose frames are cheap for a while (a full day at 5-min resolution is
-    288 frames; at ~8-15KB each that's roughly 2-4MB/day, ~1GB/year). Git
-    handles that fine for a year or two. This script exists for when you'd
-    rather trade a bit of the archive's browsability for a much smaller
-    repo -- e.g. once you're keeping years of history, or you want a smooth
-    "play this whole day" scrubber without fetching 288 separate files.
-  - Run it (see consolidate.yml) only for days that are fully in the past
-    (yesterday or older), never for today, since today's index is still
-    being appended to by fetch_and_process.py.
-
-After consolidation, the day's index gains a "video" field pointing at the
-packed file; frame-level "file" entries are kept in the index (so old links
-don't break) but the loose files on disk are deleted. If you'd rather keep
-loose files forever and never run this, that's a perfectly reasonable
-choice too -- just don't wire up consolidate.yml.
+- Reads each day's index, loads all its frame images (in chronological
+  order), and saves them as a single radar-YYYY-MM-DD.webp animation.
+- Adds an "animation" key to the day index pointing at the new file.
+- Optionally deletes the loose per-frame files (currently disabled – you
+  can enable it later if you want to save disk space).
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
+from typing import List
+
+from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FRAMES_DIR = REPO_ROOT / "data" / "frames"
 INDEX_DIR = REPO_ROOT / "data" / "index"
-VIDEOS_DIR = REPO_ROOT / "data" / "videos"
+ANIMATION_DIR = REPO_ROOT / "data" / "animation"
+AVAILABLE_DAYS_FILE = INDEX_DIR / "available-days.json"
 
+FRAME_DURATION_MS = 250       # 4 frames per second
+WEBP_LOSSLESS = True
+WEBP_METHOD = 6               # slowest / best compression
 
-def consolidate_day(d: date) -> None:
+# --------------------------------------------------------------------------
+def load_day_index(d: date) -> dict:
+    """Return the JSON index for a day (empty dict if missing)."""
     idx_path = INDEX_DIR / f"{d.isoformat()}.json"
-    if not idx_path.exists():
-        print(f"no index for {d}, nothing to do")
-        return
+    if idx_path.exists():
+        return json.loads(idx_path.read_text())
+    return {"date": d.isoformat(), "frames": []}
 
-    idx = json.loads(idx_path.read_text())
-    frames = sorted(idx["frames"], key=lambda f: f["time"])
-    if len(frames) < 2:
-        print(f"{d}: fewer than 2 frames, skipping consolidation")
-        return
+def save_day_index(d: date, idx: dict) -> None:
+    """Write an updated day index back to disk."""
+    INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    idx["frames"].sort(key=lambda f: f["time"])
+    (INDEX_DIR / f"{d.isoformat()}.json").write_text(
+        json.dumps(idx, separators=(",", ":"))
+    )
 
-    if "video" in idx:
-        print(f"{d}: already consolidated")
-        return
+def consolidate_day(d: date) -> bool:
+    """
+    Build a daily WebP animation for day `d`.
+    Returns True if something was created, False otherwise.
+    """
+    idx = load_day_index(d)
+    frames_meta = idx.get("frames", [])
 
-    # Build an ffmpeg concat list (frames may have gaps -- e.g. a missed
-    # 5-min slot -- so we don't assume a fixed frame count, just fixed
-    # per-frame duration).
-    list_file = VIDEOS_DIR / f"{d.isoformat()}.txt"
-    VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(list_file, "w") as f:
-        for fr in frames:
-            f.write(f"file '{(REPO_ROOT / fr['file']).resolve()}'\n")
-            f.write("duration 0.2\n")
-        # ffmpeg concat demuxer needs the last file repeated without a duration
-        f.write(f"file '{(REPO_ROOT / frames[-1]['file']).resolve()}'\n")
+    # Already consolidated?
+    if "animation" in idx:
+        print(f"  {d} already consolidated → skip")
+        return False
 
-    out_path = VIDEOS_DIR / f"{d.isoformat()}.webm"
-    cmd = [
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
-        "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "32", "-pix_fmt", "yuv420p",
-        str(out_path),
-    ]
-    print("running:", " ".join(cmd))
-    subprocess.run(cmd, check=True)
-    list_file.unlink()
+    if len(frames_meta) < 2:
+        print(f"  {d} has fewer than 2 frames → skip")
+        return False
 
-    # Update index: record the video, drop the loose files (keep their
-    # timestamps in the index so consumers still know exactly what's
-    # covered, just without a per-frame file link).
-    idx["video"] = str(out_path.relative_to(REPO_ROOT))
-    for fr in frames:
-        loose = REPO_ROOT / fr["file"]
-        if loose.exists():
-            loose.unlink()
-        fr.pop("file", None)
-    idx["frames"] = frames
-    idx_path.write_text(json.dumps(idx, separators=(",", ":")))
-    print(f"{d}: consolidated {len(frames)} frames -> {out_path} "
-          f"({out_path.stat().st_size / 1024:.0f} KB)")
+    # Load images in chronological order
+    images: List[Image.Image] = []
+    for meta in frames_meta:
+        file_path = meta.get("file")
+        if file_path is None:
+            print(f"  WARNING: {d} frame {meta['time']} has no 'file' entry")
+            continue
+        full_path = REPO_ROOT / file_path
+        if not full_path.exists():
+            print(f"  WARNING: {d} frame {meta['time']} missing file {file_path}")
+            continue
+        try:
+            img = Image.open(full_path).convert("RGB")
+            images.append(img)
+        except Exception as exc:
+            print(f"  ERROR loading {file_path}: {exc}")
+            return False
+
+    if len(images) < 2:
+        print(f"  {d} not enough valid images → skip")
+        return False
+
+    # Save as animation
+    ANIMATION_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = ANIMATION_DIR / f"{d.isoformat()}.webp"
+
+    first = images[0]
+    rest = images[1:] if len(images) > 1 else []
+    first.save(
+        out_path,
+        "WEBP",
+        save_all=True,
+        append_images=rest,
+        duration=FRAME_DURATION_MS,
+        loop=0,                # infinite loop
+        lossless=WEBP_LOSSLESS,
+        quality=100 if WEBP_LOSSLESS else 70,
+        method=WEBP_METHOD,
+    )
+
+    # Record the animation in the day index
+    relative_path = str(out_path.relative_to(REPO_ROOT))
+    idx["animation"] = relative_path
+
+    # Optional: delete loose frame files after successful consolidation.
+    # Uncomment this block when you're ready to reclaim disk space.
+    # =========================================================================
+    # for meta in frames_meta:
+    #     if "file" in meta:
+    #         loose_file = REPO_ROOT / meta.pop("file")
+    #         if loose_file.exists():
+    #             loose_file.unlink()
+    #             print(f"    deleted {loose_file}")
+    # =========================================================================
+
+    save_day_index(d, idx)
+
+    file_size_kb = out_path.stat().st_size / 1024
+    print(f"  ✓ {d}: {len(images)} frames → {out_path.name} ({file_size_kb:.0f} KB)")
+    return True
 
 
+def consolidate_all_yesterday_and_before() -> int:
+    """
+    Consolidate every available day that is **strictly before today**
+    (i.e. the day is fully complete). Returns the number of days processed.
+    """
+    if not AVAILABLE_DAYS_FILE.exists():
+        print("No available-days.json yet – nothing to do.")
+        return 0
+
+    days_data = json.loads(AVAILABLE_DAYS_FILE.read_text())
+    all_days = sorted(days_data.get("days", []))
+
+    today = date.today()
+    count = 0
+
+    for day_iso in all_days:
+        d = date.fromisoformat(day_iso)
+        if d >= today:
+            print(f"  {d} is today or future → skip")
+            continue
+        if consolidate_day(d):
+            count += 1
+
+    return count
+
+
+# --------------------------------------------------------------------------
 if __name__ == "__main__":
-    # Default: consolidate yesterday (UTC). Pass an explicit YYYY-MM-DD to
-    # do a different day, e.g. for backfilling.
+    # Optional: pass a specific date as YYYY-MM-DD
     if len(sys.argv) > 1:
         target = date.fromisoformat(sys.argv[1])
+        if target >= date.today():
+            print(f"Error: {target} is not a completed day (must be before today)")
+            sys.exit(1)
+        consolidate_day(target)
     else:
-        target = date.today() - timedelta(days=1)
-    consolidate_day(target)
+        # Default: all days up to yesterday
+        n = consolidate_all_yesterday_and_before()
+        print(f"\nDone – consolidated {n} day(s).")
