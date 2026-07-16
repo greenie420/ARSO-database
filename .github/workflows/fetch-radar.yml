@@ -2,7 +2,7 @@ name: Fetch ARSO radar frames
 
 on:
   schedule:
-    - cron: "0,5,10,15,20,25,30,35,40,45,50,55 * * * *"   # every 5 minutes on the round marks
+    - cron: "*/15 * * * *"   # every 15 minutes
   workflow_dispatch: {}
 
 concurrency:

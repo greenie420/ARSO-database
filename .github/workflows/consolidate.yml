@@ -9,7 +9,7 @@ name: Consolidate previous day (optional)
 
 on:
   schedule:
-    - cron: "15 0 * * *" # 00:15 UTC daily
+    - cron: "0 3 * * *" # 3:00 UTC daily
   workflow_dispatch:
     inputs:
       date:
