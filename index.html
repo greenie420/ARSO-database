@@ -19,6 +19,7 @@
       --accent-dry: #9c8a5f;
       --accent-ink: #3d3a33;
       --danger: #a55b4b;
+      --danger-overlay: rgba(165, 91, 75, 0.25);
       --shadow: 0 8px 30px rgba(30, 28, 22, 0.12);
       --radius: 10px;
       --font-display: "Space Grotesk", "Inter", system-ui, sans-serif;
@@ -35,11 +36,13 @@
       --accent: #7f9ca8;
       --accent-dry: #b9a877;
       --accent-ink: #eae6dd;
+      --danger: #c4705e;
+      --danger-overlay: rgba(196, 112, 94, 0.3);
       --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
     }
 
     * { box-sizing: border-box; }
-    html, body { height: 100%; }
+    html, body { height: 100%; overflow: hidden; }
     body {
       margin: 0;
       background: var(--bg);
@@ -56,6 +59,7 @@
       display: grid;
       grid-template-columns: auto 1fr;
       height: 100vh;
+      overflow: hidden;
     }
 
     /* Rail */
@@ -101,7 +105,7 @@
       width: 320px;
       background: var(--surface);
       border-right: 1px solid var(--border);
-      transform: translateX(-360px);
+      transform: translateX(-100%);
       transition: transform 200ms cubic-bezier(.4,0,.2,1);
       z-index: 20;
       padding: 22px 18px;
@@ -147,20 +151,62 @@
     .accordion-item.open .accordion-panel { max-height: 500px; }
     .accordion-body { padding: 2px 2px 16px; }
 
+    /* Bookmarks */
     .bookmark-row {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 8px 8px;
       border-radius: 7px;
       cursor: pointer;
       font-size: 13.5px;
+      gap: 8px;
     }
     .bookmark-row:hover { background: var(--surface-2); }
-    .bookmark-name { display: flex; align-items: center; gap: 8px; }
-    .bookmark-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-    .bookmark-coords { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); }
+    .bookmark-row:hover .bookmark-delete { opacity: 1; }
+    .bookmark-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+    .bookmark-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+    .bookmark-coords {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .bookmark-delete {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 120ms ease, background 120ms ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .bookmark-delete:hover {
+      background: var(--danger);
+      color: var(--surface);
+      opacity: 1;
+    }
     .empty-hint { font-size: 12.5px; color: var(--text-dim); padding: 6px 8px; line-height: 1.5; }
 
-    input[type="text"], input[type="date"], select {
+    /* Form inputs */
+    input[type="text"], input[type="date"], input[type="time"], select {
       width: 100%;
       background: var(--bg);
       border: 1px solid var(--border);
@@ -201,6 +247,21 @@
     .field-row { display: flex; gap: 8px; }
     .field-row > * { flex: 1; }
 
+    .pick-on-map-btn {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text);
+      font-family: var(--font-body);
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .pick-on-map-btn:hover { background: var(--surface-2); }
+    .pick-on-map-btn.active { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+
     .search-result {
       margin-top: 10px;
       font-size: 12.5px;
@@ -219,13 +280,17 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
+      height: 100vh;
+      overflow: hidden;
     }
     .topbar {
+      flex: 0 0 auto;
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 16px 24px;
       border-bottom: 1px solid var(--border);
+      z-index: 10;
     }
     .topbar-title { display: flex; align-items: baseline; gap: 10px; }
     .topbar-title h1 {
@@ -235,25 +300,50 @@
       letter-spacing: .01em;
     }
     .topbar-title .subtitle { font-size: 12px; color: var(--text-dim); }
+
+    /* Weather chip */
     .weather-chip {
-      display: flex; align-items: center; gap: 7px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
       font-family: var(--font-mono);
       font-size: 11.5px;
       color: var(--text-dim);
       border: 1px solid var(--border);
       border-radius: 20px;
       padding: 5px 12px;
+      position: relative;
     }
-    .weather-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-dry); }
+    .weather-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-dry); flex-shrink: 0; }
+    .weather-chip .clear-location {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      margin-left: 2px;
+      transition: background 120ms ease;
+    }
+    .weather-chip .clear-location:hover { background: var(--surface-2); color: var(--text); }
+    .weather-chip.has-location .clear-location { display: flex; }
 
+    /* Viewer */
     .viewer {
-      flex: 1;
+      flex: 1 1 auto;
       display: flex;
       align-items: center;
       justify-content: center;
       position: relative;
       padding: 24px;
       min-height: 0;
+      overflow: hidden;
     }
     .frame-card {
       position: relative;
@@ -262,8 +352,11 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       padding: 14px;
-      max-width: min(720px, 100%);
-      width: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      width: auto;
+      display: flex;
+      flex-direction: column;
     }
     .frame-image-wrap {
       position: relative;
@@ -271,7 +364,11 @@
       background: var(--surface-2);
       border-radius: 6px;
       overflow: hidden;
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      max-height: calc(100vh - 280px);
+      min-height: 200px;
     }
     .frame-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: none; }
     .frame-placeholder {
@@ -282,6 +379,7 @@
       line-height: 1.6;
     }
     .frame-placeholder .big { font-family: var(--font-mono); font-size: 22px; color: var(--text); display:block; margin-bottom: 6px;}
+
     .loc-marker {
       position: absolute;
       width: 10px; height: 10px;
@@ -292,21 +390,99 @@
       transform: translate(-50%, -50%);
       display: none;
       z-index: 5;
+      pointer-events: none;
     }
+
+    /* Missing frame overlay */
+    #missingFrameOverlay {
+      position: absolute;
+      inset: 0;
+      background: var(--danger-overlay);
+      display: none;
+      pointer-events: none;
+      z-index: 4;
+      border-radius: 0;
+    }
+
+    /* Image transform overlay */
+    .image-transform-overlay {
+      position: absolute;
+      inset: 0;
+      cursor: grab;
+      z-index: 10;
+    }
+    .image-transform-overlay:active { cursor: grabbing; }
+    .image-transform-overlay.panning { cursor: grabbing; }
+
+    .setup-mode-controls {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 8px;
+      z-index: 20;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 12px;
+      box-shadow: var(--shadow);
+    }
+    .setup-mode-controls button {
+      padding: 6px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--font-body);
+      white-space: nowrap;
+    }
+    .setup-mode-controls button.primary {
+      background: var(--accent);
+      color: var(--surface);
+      border-color: var(--accent);
+    }
+    .setup-mode-controls button:hover { opacity: 0.85; }
+
+    .zoom-indicator {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    /* Frame meta */
     .frame-meta {
-      display: flex; justify-content: space-between; align-items: center;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-top: 12px;
       font-family: var(--font-mono);
       font-size: 12px;
       color: var(--text-dim);
+      flex-wrap: wrap;
+      gap: 4px;
     }
-    .frame-meta .current-time { color: var(--text); font-size: 15px; }
+    .frame-meta .current-time { color: var(--text); font-size: 15px; white-space: nowrap; }
+    #dayCoverageLabel { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); flex-shrink: 0; }
 
-    /* Enhanced Timeline */
+    /* Timeline */
     .timeline-bar {
+      flex: 0 0 auto;
       border-top: 1px solid var(--border);
       padding: 16px 24px 18px;
       background: var(--surface);
+      z-index: 10;
     }
     .timeline-controls {
       display: flex;
@@ -320,32 +496,49 @@
       border: 1.5px solid var(--border);
       background: var(--bg);
       color: var(--text);
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       transition: background 120ms ease;
+      flex-shrink: 0;
     }
     .playback-btn:hover { background: var(--surface-2); }
     .playback-btn.active { background: var(--accent); color: var(--surface); border-color: var(--accent); }
     .playback-btn svg { width: 14px; height: 14px; }
-    .speed-select {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 4px 10px;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-dim);
-      cursor: pointer;
-      appearance: none;
-      -webkit-appearance: none;
-    }
-    .speed-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .timeline-date { font-family: var(--font-mono); font-size: 12px; color: var(--text-dim); margin-left: auto; }
 
-    /* Scrubber with time labels */
-    .scrubber-container {
-      position: relative;
+    .timeline-date {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-left: auto;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
+
+    /* Speed slider */
+    .speed-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 4px;
+    }
+    .speed-slider-container input[type="range"] {
+      width: 80px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      height: 4px;
+    }
+    .speed-slider-container span {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    #speedLabel { font-size: 11px !important; color: var(--text) !important; width: 36px; text-align: center; }
+
+    /* Scrubber */
+    .scrubber-container { position: relative; }
     .scrubber-labels {
       display: flex;
       justify-content: space-between;
@@ -355,6 +548,9 @@
       margin-bottom: 4px;
       padding: 0 1px;
     }
+    .scrubber-labels span:first-child { text-align: left; }
+    .scrubber-labels span:last-child { text-align: right; }
+
     .scrubber {
       position: relative;
       height: 36px;
@@ -362,8 +558,13 @@
       align-items: flex-end;
       gap: 2px;
       cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .scrubber:hover .tick.available { height: 65%; }
+    .scrubber:hover .tick.missing { height: 55%; }
+    .scrubber:active .tick.available { height: 75%; }
+    .scrubber:active .tick.missing { height: 60%; }
     .scrubber-progress {
       position: absolute;
       bottom: 0;
@@ -374,6 +575,7 @@
       border-radius: 2px;
       pointer-events: none;
       transition: width 80ms linear;
+      z-index: 0;
     }
     .tick {
       flex: 1;
@@ -386,8 +588,11 @@
     }
     .tick.hour { height: 55%; background: var(--text-dim); }
     .tick.available { background: var(--accent); }
+    .tick.missing { background: var(--danger); opacity: 0.35; }
     .tick.current { background: var(--accent-ink); height: 100%; }
+    .tick.current.missing { background: var(--danger); opacity: 0.8; height: 100%; }
     .tick.past { background: var(--accent); opacity: 0.6; }
+    .tick.past.missing { background: var(--danger); opacity: 0.5; }
     .scrubber-time-tooltip {
       position: absolute;
       bottom: 100%;
@@ -438,11 +643,7 @@
       border-radius: 3px;
       margin: 8px auto 16px;
     }
-    .sheet h2 {
-      font-family: var(--font-display);
-      font-size: 16px;
-      margin: 0 0 16px;
-    }
+    .sheet h2 { font-family: var(--font-display); font-size: 16px; margin: 0 0 16px; }
     .setting-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 0;
@@ -450,7 +651,9 @@
     }
     .setting-row:last-of-type { border-bottom: none; }
     .setting-label { font-size: 13.5px; }
-    .setting-hint { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+    .setting-hint { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; line-height: 1.5; }
+    .setting-hint a { color: var(--accent); text-decoration: underline; }
+    .setting-hint a:hover { opacity: 0.8; }
 
     .theme-switch {
       display: flex;
@@ -466,15 +669,39 @@
     }
     .theme-switch button.active { background: var(--accent-ink); color: var(--surface); }
 
+    /* Acknowledgement section */
+    .acknowledgement-row {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: none;
+    }
+
+    /* Speed select (hidden, replaced by slider) */
+    .speed-select { display: none; }
+
+    /* Mobile */
     @media (max-width: 640px) {
-      .drawer { width: calc(100vw - 64px); left: 64px; }
+      .drawer {
+        width: calc(100vw - 64px);
+        left: 64px;
+        transform: translateX(calc(-100% - 64px));
+      }
+      .drawer.open { transform: translateX(0); }
       .frame-meta { flex-direction: column; align-items: flex-start; gap: 4px; }
-      .timeline-controls { flex-wrap: wrap; }
+      .timeline-controls { flex-wrap: wrap; gap: 6px; }
+      .speed-slider-container { order: 3; width: 100%; margin-left: 0; margin-top: 4px; }
+      .viewer { padding: 12px; }
+      .timeline-bar { padding: 12px 16px 14px; }
+      .frame-image-wrap { max-height: calc(100vh - 320px); }
+      .setup-mode-controls { bottom: 8px; padding: 4px 8px; gap: 4px; }
+      .setup-mode-controls button { padding: 4px 10px; font-size: 11px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
       .drawer, .sheet, .scrim, .tick, .accordion-panel, .accordion-trigger .chev,
-      .scrubber-progress { transition: none; }
+      .scrubber-progress, .bookmark-delete { transition: none; }
     }
   </style>
 </head>
@@ -550,6 +777,7 @@
               <label class="field-label" for="placeInput">City, address, or "lat, lon"</label>
               <div class="field-row">
                 <input type="text" id="placeInput" placeholder="e.g. Ljubljana" />
+                <button class="pick-on-map-btn" id="btnPickOnMap" title="Pick location on map">Map</button>
               </div>
               <button class="btn" id="btnSearchPlace">Search</button>
               <div class="search-result" id="placeResult">
@@ -567,12 +795,13 @@
     <main class="stage">
       <header class="topbar">
         <div class="topbar-title">
-          <h1>OSRA</h1> <!-- make it like a reflaction, and use the rain effect (https://www.codewithrandom.com/2024/08/25/15-css-rain-effects/#4.%20Slanting%20Rain%20Effect%20in%20CSS) -->
+          <h1>OSRA</h1>
           <span class="subtitle">ARSO rain-radar timelapse</span>
         </div>
         <div class="weather-chip" id="weatherChip">
           <span class="dot" id="weatherDot"></span>
           <span id="weatherLabel">Location not set</span>
+          <button class="clear-location" id="btnClearLocation" title="Clear location">&times;</button>
         </div>
       </header>
 
@@ -582,35 +811,32 @@
             <img id="frameImage" alt="Radar frame" />
             <div class="frame-placeholder" id="framePlaceholder">
               <span class="big" id="placeholderTime">&ndash;&ndash;:&ndash;&ndash;</span>
-              No frame loaded yet. Set <code>DATA_BASE_URL</code> in app.js to your
-              published <code>data/</code> folder, or use &ldquo;Go to date &amp; time&rdquo;
-              once frames are archived.
+              No frame loaded yet.
             </div>
             <div class="loc-marker" id="locMarker" title="Selected location"></div>
           </div>
           <div class="frame-meta">
             <span class="current-time" id="currentFrameTime">No frame selected</span>
-            <span id="currentFrameStatus">&mdash;</span>
+            <span id="dayCoverageLabel"></span>
           </div>
         </div>
       </div>
 
-      <!-- Enhanced Timeline -->
+      <!-- Timeline -->
       <div class="timeline-bar">
         <div class="timeline-controls">
-          <button class="playback-btn" id="btnStop" title="Stop">
-            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
-          </button>
-          <button class="playback-btn" id="btnPlay" title="Play/Pause">
+          <button class="playback-btn" id="btnPlay" title="Play/Pause" style="display:flex;">
             <svg viewBox="0 0 24 24" fill="currentColor" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
           </button>
-          <select class="speed-select" id="speedSelect" title="Playback speed">
-            <option value="0.25">0.25×</option>
-            <option value="0.5">0.5×</option>
-            <option value="1" selected>1×</option>
-            <option value="2">2×</option>
-            <option value="4">4×</option>
-          </select>
+          <button class="playback-btn" id="btnStop" title="Stop" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+          </button>
+          <div class="speed-slider-container">
+            <span>0.1&times;</span>
+            <input type="range" id="speedSlider" min="1" max="15" value="10" step="1" title="Playback speed" />
+            <span>6&times;</span>
+            <span id="speedLabel">1&times;</span>
+          </div>
           <span class="timeline-date" id="timelineDateLabel">No day loaded</span>
         </div>
         <div class="scrubber-container">
@@ -618,7 +844,7 @@
             <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>23:55</span>
           </div>
           <div class="scrubber" id="scrubber">
-            <div class="scrubber-progress" id="scrubberProgress" style="width: 0%"></div>
+            <div class="scrubber-progress" id="scrubberProgress" style="width:0%"></div>
             <div class="scrubber-time-tooltip" id="scrubberTooltip">00:00</div>
           </div>
         </div>
@@ -652,7 +878,16 @@
     <div class="setting-row" style="border-bottom:none;">
       <div>
         <div class="setting-label">Weather-aware icon</div>
-        <div class="setting-hint">Not implemented yet &mdash; see initWeatherIconState() in app.js</div>
+        <div class="setting-hint">Not implemented yet</div>
+      </div>
+    </div>
+    <div class="setting-row" style="border-bottom:none;flex-direction:column;align-items:flex-start;">
+      <div>
+        <div class="setting-label">Data source</div>
+        <div class="setting-hint">
+          Radar images courtesy of <a href="https://meteo.arso.gov.si/met/sl/weather/observ/radar/" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;">ARSO Slovenija</a>.
+          This project is not affiliated with ARSO.
+        </div>
       </div>
     </div>
   </div>
@@ -663,8 +898,12 @@
    ========================================================================= */
 let DATA_BASE_URL = "https://raw.githubusercontent.com/greenie420/ARSO-database/main/data";
 
-const RADAR_IMAGE_BOUNDS = { north: 46.9, south: 45.35, west: 13.3, east: 16.65 }; // needs rework because it is bigger than Slovenia
+const IMG_LEFT = 10, IMG_RIGHT = 10, IMG_TOP = 49, IMG_BOTTOM = 10;
+const RADAR_IMAGE_BOUNDS = { north: 47.398643342121645, south: 44.69256630453307, west: 12.156354762810897, east: 17.382362387495476 };
+
 const DEFAULT_ICON_SVG = `<svg viewBox="0 0 1024 1024" class="icon" version="1.1" xmlns="http://www.w3.org/2000/svg" fill="#000000"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M729.6 626.56S666.24 481.28 536.96 490.24c-1.28 0-152.96-4.48-179.84 189.44 0-1.28-161.28-15.36-172.16 106.24 1.28 0.64-12.8 156.8 190.72 143.36l445.44 0.768s179.84-75.264 106.88-220.16-198.4-83.328-198.4-83.328z" fill="#FFFFFF"></path><path d="M739.968 413.184c0 47.872-9.856 93.568-27.648 134.912-6.144 14.336-13.312 28.16-21.248 41.472-29.184-49.28-82.944-82.432-144.128-82.432-90.368 0-164.096 71.936-167.296 161.408-0.128 2.048-0.128 3.968-0.128 6.016v0.512c0 2.048 0 4.096 0.128 6.144 0.64 14.592-13.952 25.088-27.52 20.224-1.792-0.64-3.328-1.28-5.12-1.792h-0.256c-0.512-0.256-1.024-0.256-1.664-0.512s-1.28-0.256-1.792-0.512c-1.28-0.256-2.304-0.64-3.584-0.896-7.168-1.664-14.592-2.56-22.144-2.816-26.88-0.512-51.712 8.832-71.04 24.704-12.928-6.4-25.344-13.568-37.248-21.504C116.992 637.056 56.192 532.352 56.192 413.184c0-188.8 153.088-341.76 341.888-341.76 188.8 0 341.888 152.96 341.888 341.76z m0 0" fill="#FFBC00"></path><path d="M787.712 598.528c-15.488 0.128-30.464 2.176-44.672 5.888-13.184 3.456-25.856 8.448-37.632 14.848-0.256 0.128-0.256 0.384-0.256 0.64 0.256 0.768 0.512 1.664 0.768 2.432 0.256 0.512 0.256 1.024 0.512 1.536 0.256 0.768 0.512 1.792 0.768 2.56 4.864 16.128 22.016 25.344 38.144 19.968 0.64-0.256 1.28-0.384 1.792-0.64 1.024-0.256 2.048-0.64 2.944-0.896 1.024-0.256 1.92-0.64 2.944-0.768 9.216-2.432 18.816-3.968 28.672-4.48 81.664-3.968 149.12 65.152 142.976 146.688-4.864 63.744-53.504 115.328-115.712 124.672-6.656 1.024-13.568 1.536-20.48 1.536h-111.872c-0.512 0-0.768 0.64-0.256 0.896 29.44 24.064 66.688 38.784 107.264 39.936 1.664 0.128 3.328 0.128 4.864 0.128 6.912 0 13.696-0.384 20.48-1.152 88.576-10.24 157.44-85.888 157.056-177.28-0.384-97.536-80.64-176.896-178.304-176.512zM335.872 912.64h-20.48c-6.912 0-13.824-0.64-20.48-1.92-51.072-9.856-89.6-55.424-88.32-109.696 0.768-32.768 16.256-61.824 39.936-81.152 19.328-15.872 44.288-25.216 71.04-24.704 7.552 0.256 14.976 1.152 22.144 2.816 1.28 0.256 2.304 0.64 3.584 0.896 0.64 0.128 1.28 0.256 1.792 0.512 0.512 0.128 1.024 0.256 1.664 0.512h0.256c16.256 4.992 32.64-7.424 32.512-24.576v-0.512c0-2.048 0-4.096 0.128-6.016-12.544-6.016-26.112-10.24-40.192-12.544-7.808-1.28-15.744-1.92-23.936-1.92-41.344 0-78.976 16.896-106.112 44.16-26.88 27.136-43.648 64.384-43.648 105.6 0 75.52 56.32 138.368 129.28 148.224 5.248 0.768 10.496 1.152 15.744 1.28h0.256c1.408 0.128 2.944 0.128 4.352 0.128 1.536 0 3.072 0 4.608-0.128 37.888-1.152 72.448-16.512 98.176-40.832h-82.304z m0 0" fill="#6D6D6D"></path><path d="M743.04 604.416c-7.424-20.352-17.664-39.296-30.72-56.192-38.144-49.792-98.048-81.92-165.504-81.92-108.672 0-198.144 83.584-207.616 189.696-0.512 6.144-0.768 12.416-0.768 18.688 0 7.808 0.384 15.616 1.28 23.168 1.28 0.256 2.304 0.64 3.584 0.896 0.64 0.128 1.28 0.256 1.792 0.512 0.512 0.128 1.024 0.256 1.664 0.512h0.256c1.792 0.512 3.328 1.152 5.12 1.792 13.696 4.864 28.16-5.632 27.52-20.224-0.128-2.048-0.128-4.096-0.128-6.144v-0.512c0-2.048 0-4.096 0.128-6.016 3.2-89.472 77.056-161.408 167.296-161.408 61.312 0 114.944 33.024 144.128 82.432 5.504 9.472 10.24 19.328 13.952 29.824 0 0.128 0.128 0.256 0.128 0.384 0.256 0.768 0.512 1.664 0.768 2.432 0.256 0.512 0.256 1.024 0.512 1.536 0.128 0.256 0.256 0.512 0.256 0.768 5.376 17.024 23.424 26.752 40.448 21.248 1.024-0.256 2.048-0.64 2.944-0.896 1.024-0.256 1.92-0.64 2.944-0.768-2.048-13.824-5.376-27.136-9.984-39.808zM788.48 912.64c-6.912 0-13.824 1.024-20.48 0H335.872c-2.304 0.384-4.352 0.512-6.656 0.512-4.48 0-9.088-0.512-13.824-0.512-6.912 0-13.824-0.64-20.48-1.92l15.744 42.752h478.72l19.712-42.368c-6.784 1.024-13.568 1.536-20.608 1.536z m0 0" fill="#6D6D6D"></path></g></svg>`;
+
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 /* =========================================================================
    STATE
@@ -672,19 +911,107 @@ const DEFAULT_ICON_SVG = `<svg viewBox="0 0 1024 1024" class="icon" version="1.1
 let currentLocation = null;
 let bookmarks = [];
 let currentDayIndex = null;
-let currentDate = new Date();
 let currentFrame = null;
 let currentFrameIndex = -1;
 let playbackSpeed = 1;
 let playTimer = null;
 let isPlaying = false;
-let animationMode = false;
-let animationFrames = [];        // Array of {time, image} objects
+let animationFrames = [];
 let animationFrameIndex = 0;
 let animationCanvas = null;
 let animationCtx = null;
 let animationRequestId = null;
+let imageTransform = { x: 0, y: 0, scale: 1 };
+let setupMode = false;
+let setupStartTransform = null;
+let isPanning = false;
+let panStart = { x: 0, y: 0, transformX: 0, transformY: 0 };
+let lastPinchDistance = 0;
+let mapPickMode = false;
+let availableTimesSet = new Set();
+let frameTimeMap = {}; // Maps "HH:MM" -> frame data (for quick lookup)
+let missingOverlayVisible = false;
 const FRAME_DURATION_MS = 200;
+
+/* =========================================================================
+   INDEXEDDB
+   ========================================================================= */
+const DB_NAME = "arso-radar-db";
+const DB_VERSION = 1;
+let db = null;
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains("bookmarks")) {
+        const bookmarkStore = db.createObjectStore("bookmarks", { keyPath: "id" });
+        bookmarkStore.createIndex("name", "name", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("settings")) {
+        db.createObjectStore("settings", { keyPath: "key" });
+      }
+    };
+    request.onsuccess = (event) => { db = event.target.result; resolve(db); };
+    request.onerror = (event) => { console.error("IndexedDB error:", event.target.error); reject(event.target.error); };
+  });
+}
+
+async function saveBookmarks() {
+  if (!db) await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(["bookmarks"], "readwrite");
+    const store = transaction.objectStore("bookmarks");
+    store.clear();
+    bookmarks.forEach(bm => store.add(bm));
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function loadBookmarks() {
+  if (!db) await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(["bookmarks"], "readonly");
+    const store = transaction.objectStore("bookmarks");
+    const request = store.getAll();
+    request.onsuccess = () => { bookmarks = request.result || []; renderBookmarks(); resolve(bookmarks); };
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function saveSetting(key, value) {
+  if (!db) await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(["settings"], "readwrite");
+    const store = transaction.objectStore("settings");
+    store.put({ key, value });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function loadSetting(key, defaultValue = null) {
+  if (!db) await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(["settings"], "readonly");
+    const store = transaction.objectStore("settings");
+    const request = store.get(key);
+    request.onsuccess = () => resolve(request.result ? request.result.value : defaultValue);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+/* =========================================================================
+   FORMAT HELPERS
+   ========================================================================= */
+function formatDisplayDate(dateStr) {
+  const [y,m,d] = dateStr.split("-");
+  return `${d} ${MONTHS[parseInt(m)-1]} ${y}`;
+}
+function formatDisplayTime(timeStr) { return timeStr; }
+function formatDisplayDatetime(dateStr, timeStr) { return `${formatDisplayDate(dateStr)} ${formatDisplayTime(timeStr)} UTC`; }
 
 /* =========================================================================
    ICON / FAVICON
@@ -698,12 +1025,10 @@ function setFavicon(svgString) {
   if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
   link.href = svgToDataUri(svgString);
 }
-function renderBrandIcon(svgString) {
-  document.getElementById("brandIcon").innerHTML = svgString;
-}
+function renderBrandIcon(svgString) { document.getElementById("brandIcon").innerHTML = svgString; }
 
 /* =========================================================================
-   WEATHER-AWARE ICON STUBS
+   WEATHER STUBS
    ========================================================================= */
 async function getUserLocation() { return null; }
 async function checkIfRaining(lat, lon) { return null; }
@@ -728,12 +1053,8 @@ const railButtons = {
 function openDrawerPanel(panelName) {
   drawer.classList.add("open");
   drawer.setAttribute("aria-hidden", "false");
-  document.querySelectorAll(".accordion-item").forEach(item =>
-    item.classList.toggle("open", item.dataset.panel === panelName)
-  );
-  Object.entries(railButtons).forEach(([key, btn]) =>
-    btn.classList.toggle("active", key === panelName)
-  );
+  document.querySelectorAll(".accordion-item").forEach(item => item.classList.toggle("open", item.dataset.panel === panelName));
+  Object.entries(railButtons).forEach(([key, btn]) => btn.classList.toggle("active", key === panelName));
 }
 function closeDrawer() {
   drawer.classList.remove("open");
@@ -741,16 +1062,13 @@ function closeDrawer() {
   Object.values(railButtons).forEach(btn => btn.classList.remove("active"));
 }
 railButtons.bookmarks.addEventListener("click", () => {
-  drawer.classList.contains("open") && railButtons.bookmarks.classList.contains("active")
-    ? closeDrawer() : openDrawerPanel("bookmarks");
+  drawer.classList.contains("open") && railButtons.bookmarks.classList.contains("active") ? closeDrawer() : openDrawerPanel("bookmarks");
 });
 railButtons.timetravel.addEventListener("click", () => {
-  drawer.classList.contains("open") && railButtons.timetravel.classList.contains("active")
-    ? closeDrawer() : openDrawerPanel("timetravel");
+  drawer.classList.contains("open") && railButtons.timetravel.classList.contains("active") ? closeDrawer() : openDrawerPanel("timetravel");
 });
 railButtons.findplace.addEventListener("click", () => {
-  drawer.classList.contains("open") && railButtons.findplace.classList.contains("active")
-    ? closeDrawer() : openDrawerPanel("findplace");
+  drawer.classList.contains("open") && railButtons.findplace.classList.contains("active") ? closeDrawer() : openDrawerPanel("findplace");
 });
 document.getElementById("drawerClose").addEventListener("click", closeDrawer);
 document.querySelectorAll(".accordion-trigger").forEach(trigger => {
@@ -778,20 +1096,14 @@ scrim.addEventListener("click", closeSheet);
 let themePref = "system";
 function applyTheme() {
   const root = document.documentElement;
-  const resolved = themePref === "system"
-    ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    : themePref;
+  const resolved = themePref === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : themePref;
   root.setAttribute("data-theme", resolved);
-  document.querySelectorAll("#themeSwitch button").forEach(b =>
-    b.classList.toggle("active", b.dataset.themeChoice === themePref)
-  );
+  document.querySelectorAll("#themeSwitch button").forEach(b => b.classList.toggle("active", b.dataset.themeChoice === themePref));
 }
 document.querySelectorAll("#themeSwitch button").forEach(btn => {
-  btn.addEventListener("click", () => { themePref = btn.dataset.themeChoice; applyTheme(); });
+  btn.addEventListener("click", () => { themePref = btn.dataset.themeChoice; applyTheme(); saveSetting("theme", themePref); });
 });
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-  if (themePref === "system") applyTheme();
-});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (themePref === "system") applyTheme(); });
 
 /* =========================================================================
    BOOKMARKS
@@ -806,49 +1118,123 @@ function renderBookmarks() {
     row.className = "bookmark-row";
     row.innerHTML = `
       <span class="bookmark-name"><span class="bookmark-dot"></span>${escapeHtml(bm.name)}</span>
-      <span class="bookmark-coords">${bm.lat.toFixed(2)}, ${bm.lon.toFixed(2)}</span>
+      <span class="bookmark-coords">${bm.lat?.toFixed(2) || "\u2014"}, ${bm.lon?.toFixed(2) || "\u2014"}</span>
+      <button class="bookmark-delete" title="Delete bookmark" data-id="${bm.id}">&times;</button>
     `;
-    row.addEventListener("click", () => setCurrentLocation(bm.lat, bm.lon, bm.name));
+    row.addEventListener("click", (e) => { if (!e.target.closest(".bookmark-delete")) applyBookmark(bm); });
+    row.querySelector(".bookmark-delete").addEventListener("click", (e) => { e.stopPropagation(); deleteBookmark(bm.id); });
     list.appendChild(row);
   });
 }
-function escapeHtml(s) {
-  const d = document.createElement("div");
-  d.textContent = s;
-  return d.innerHTML;
+function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function applyBookmark(bm) {
+  if (bm.lat && bm.lon) setCurrentLocation(bm.lat, bm.lon, bm.name);
+  if (bm.transform) { imageTransform = { ...bm.transform }; applyImageTransform(); }
+  closeDrawer();
 }
-document.getElementById("btnSaveBookmark").addEventListener("click", () => {
-  if (!currentLocation) return;
-  bookmarks.push({ id: Date.now(), name: currentLocation.name, lat: currentLocation.lat, lon: currentLocation.lon });
+
+async function deleteBookmark(id) {
+  bookmarks = bookmarks.filter(b => b.id !== id);
   renderBookmarks();
-});
+  await saveBookmarks();
+}
+
+async function saveBookmarkWithTransform() {
+  const name = currentLocation ? currentLocation.name : "Custom view";
+  const bookmark = {
+    id: Date.now(),
+    name: name,
+    lat: currentLocation?.lat || null,
+    lon: currentLocation?.lon || null,
+    transform: { ...imageTransform },
+    date: currentDayIndex?.date || null,
+  };
+  bookmarks.push(bookmark);
+  renderBookmarks();
+  await saveBookmarks();
+  exitSetupMode(true);
+}
 
 /* =========================================================================
-   TIME INPUT (snaps to 5-minute intervals)
+   MISSING FRAME OVERLAY
+   ========================================================================= */
+function createMissingOverlay() {
+  let overlay = document.getElementById("missingFrameOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "missingFrameOverlay";
+    overlay.style.cssText = `
+      position: absolute; inset: 0;
+      background: rgba(180, 40, 40, 0.25);
+      display: none;
+      pointer-events: none;
+      z-index: 3;
+    `;
+    document.getElementById("frameImageWrap").appendChild(overlay);
+  }
+  return overlay;
+}
+
+function showMissingOverlay(show) {
+  const overlay = createMissingOverlay();
+  overlay.style.display = show ? "block" : "none";
+  missingOverlayVisible = show;
+}
+
+/* =========================================================================
+   TIME HELPERS + FRAME LOOKUP
+   ========================================================================= */
+function isoDate(d) { return d.toISOString().slice(0, 10); }
+function timeToMinutes(timeStr) { const [hh, mm] = timeStr.split(":").map(Number); return hh * 60 + mm; }
+function timeToFrameIndex(timeStr) { return Math.floor(timeToMinutes(timeStr) / 5); }
+function frameIndexToTime(index) {
+  const totalMinutes = index * 5;
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2,"0")}:${String(totalMinutes % 60).padStart(2,"0")}`;
+}
+
+// Build a lookup: for every 5-min slot in the day, what's the closest available frame?
+// Returns an array of 288 entries, each being { time, file, isMissing }
+function buildFrameSlotLookup(frames) {
+  const lookup = [];
+  const frameByTime = {};
+  (frames || []).forEach(f => { frameByTime[f.time] = f; });
+
+  for (let i = 0; i < 288; i++) {
+    const slotTime = frameIndexToTime(i);
+    if (frameByTime[slotTime]) {
+      lookup.push({ time: slotTime, file: frameByTime[slotTime].file, isMissing: false });
+    } else {
+      lookup.push({ time: slotTime, file: null, isMissing: true });
+    }
+  }
+  return lookup;
+}
+
+// Find the closest available frame's data for a given slot index
+function getNearestAvailableFrame(slotLookup, index) {
+  // Search forward first, then backward
+  for (let i = index; i < 288; i++) {
+    if (!slotLookup[i].isMissing) return slotLookup[i];
+  }
+  for (let i = index; i >= 0; i--) {
+    if (!slotLookup[i].isMissing) return slotLookup[i];
+  }
+  return null;
+}
+
+/* =========================================================================
+   TIME INPUT
    ========================================================================= */
 const timeInput = document.getElementById("timeInput");
-
 timeInput.addEventListener("change", () => {
   if (!timeInput.value) return;
   const [hh, mm] = timeInput.value.split(":").map(Number);
-  // Snap to nearest 5-minute interval
   const snappedMinutes = Math.round(mm / 5) * 5;
-  const snappedHh = String(hh).padStart(2, "0");
-  const snappedMm = String(snappedMinutes % 60).padStart(2, "0");
-  timeInput.value = `${snappedHh}:${snappedMm}`;
+  timeInput.value = `${String(hh).padStart(2,"0")}:${String(snappedMinutes % 60).padStart(2,"0")}`;
 });
-
-// Also snap when the input loses focus or user presses Enter
-timeInput.addEventListener("blur", () => {
-  timeInput.dispatchEvent(new Event("change"));
-});
-
-timeInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    timeInput.blur();
-    document.getElementById("btnGoToTime").click();
-  }
-});
+timeInput.addEventListener("blur", () => { timeInput.dispatchEvent(new Event("change")); });
+timeInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { timeInput.blur(); document.getElementById("btnGoToTime").click(); } });
 
 /* =========================================================================
    FIND PLACE
@@ -873,46 +1259,221 @@ async function searchPlace() {
     const { lat, lon, display_name } = results[0];
     showPlaceResult(parseFloat(lat), parseFloat(lon), display_name);
     setCurrentLocation(parseFloat(lat), parseFloat(lon), display_name);
-  } catch (err) {
-    console.error("Geocoding failed:", err);
-    alert("Couldn't reach the place search service.");
-  }
+  } catch (err) { console.error("Geocoding failed:", err); alert("Couldn't reach the place search service."); }
 }
 function showPlaceResult(lat, lon, name) {
   document.getElementById("placeResultName").textContent = name;
   document.getElementById("placeResultCoords").textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
   document.getElementById("placeResult").classList.add("show");
 }
+
+/* =========================================================================
+   SET / CLEAR LOCATION
+   ========================================================================= */
 function setCurrentLocation(lat, lon, name) {
   currentLocation = { lat, lon, name };
   document.getElementById("weatherLabel").textContent = name;
+  document.getElementById("weatherChip").classList.add("has-location");
   positionLocationMarker(lat, lon);
   initWeatherIconState();
 }
+
+document.getElementById("btnClearLocation").addEventListener("click", () => {
+  currentLocation = null;
+  document.getElementById("weatherLabel").textContent = "Location not set";
+  document.getElementById("locMarker").style.display = "none";
+  document.getElementById("weatherChip").classList.remove("has-location");
+  imageTransform = { x: 0, y: 0, scale: 1 };
+  applyImageTransform();
+});
+
 function positionLocationMarker(lat, lon) {
   const marker = document.getElementById("locMarker");
   const { north, south, east, west } = RADAR_IMAGE_BOUNDS;
-  if (lat > north || lat < south || lon < west || lon > east) {
-    marker.style.display = "none"; return;
-  }
-  marker.style.left = ((lon - west) / (east - west)) * 100 + "%";
-  marker.style.top = (1 - (lat - south) / (north - south)) * 100 + "%";
+  if (lat > north || lat < south || lon < west || lon > east) { marker.style.display = "none"; return; }
+  const wrap = document.getElementById("frameImageWrap");
+  const imgW = wrap.clientWidth, imgH = wrap.clientHeight;
+  const usableLeft = IMG_LEFT, usableRight = imgW - IMG_RIGHT;
+  const usableTop = IMG_TOP, usableBottom = imgH - IMG_BOTTOM;
+  const usableW = usableRight - usableLeft, usableH = usableBottom - usableTop;
+  const xPct = (lon - west) / (east - west);
+  const yPct = (north - lat) / (north - south);
+  marker.style.left = (usableLeft + xPct * usableW) + "px";
+  marker.style.top = (usableTop + yPct * usableH) + "px";
   marker.style.display = "block";
 }
 
 /* =========================================================================
-   TIME HELPERS
+   IMAGE TRANSFORM
    ========================================================================= */
-function isoDate(d) { return d.toISOString().slice(0, 10); }
-function timeToMinutes(timeStr) { const [hh, mm] = timeStr.split(":").map(Number); return hh * 60 + mm; }
-function timeToFrameIndex(timeStr) { return Math.floor(timeToMinutes(timeStr) / 5); }
-function frameIndexToTime(index) {
-  const totalMinutes = index * 5;
-  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+function applyImageTransform() {
+  const canvas = animationCanvas;
+  const img = document.getElementById("frameImage");
+  const target = (canvas && canvas.style.display !== "none") ? canvas : img;
+  if (target) {
+    target.style.transform = `translate(${imageTransform.x}px, ${imageTransform.y}px) scale(${imageTransform.scale})`;
+    target.style.transformOrigin = "center center";
+  }
 }
 
+function enterSetupMode() {
+  if (setupMode) return;
+  setupMode = true;
+  setupStartTransform = { ...imageTransform };
+  applyImageTransform();
+  let overlay = document.getElementById("imageTransformOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "imageTransformOverlay";
+    overlay.className = "image-transform-overlay";
+    document.getElementById("frameImageWrap").appendChild(overlay);
+    overlay.addEventListener("mousedown", startPan);
+    overlay.addEventListener("touchstart", startPanTouch, { passive: false });
+    window.addEventListener("mousemove", movePan);
+    window.addEventListener("touchmove", movePanTouch, { passive: false });
+    window.addEventListener("mouseup", endPan);
+    window.addEventListener("touchend", endPan);
+    overlay.addEventListener("wheel", zoomWheel, { passive: false });
+  }
+  overlay.style.display = "block";
+  showSetupControls();
+  updateZoomIndicator();
+}
+
+function exitSetupMode(save = false) {
+  if (!setupMode) return;
+  if (!save) { imageTransform = { ...setupStartTransform }; applyImageTransform(); }
+  setupMode = false;
+  setupStartTransform = null;
+  const overlay = document.getElementById("imageTransformOverlay");
+  if (overlay) overlay.style.display = "none";
+  hideSetupControls();
+  removeZoomIndicator();
+}
+
+function startPan(e) {
+  if (!setupMode) return;
+  isPanning = true;
+  panStart = { x: e.clientX, y: e.clientY, transformX: imageTransform.x, transformY: imageTransform.y };
+  document.getElementById("imageTransformOverlay").classList.add("panning");
+  e.preventDefault();
+}
+function movePan(e) {
+  if (!isPanning || !setupMode) return;
+  imageTransform.x = panStart.transformX + (e.clientX - panStart.x);
+  imageTransform.y = panStart.transformY + (e.clientY - panStart.y);
+  applyImageTransform();
+}
+function endPan() { isPanning = false; const overlay = document.getElementById("imageTransformOverlay"); if (overlay) overlay.classList.remove("panning"); }
+
+function startPanTouch(e) {
+  if (!setupMode) return;
+  if (e.touches.length === 1) {
+    isPanning = true;
+    panStart = { x: e.touches[0].clientX, y: e.touches[0].clientY, transformX: imageTransform.x, transformY: imageTransform.y };
+  } else if (e.touches.length === 2) {
+    lastPinchDistance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+  e.preventDefault();
+}
+function movePanTouch(e) {
+  if (!setupMode) return;
+  if (e.touches.length === 1 && isPanning) {
+    imageTransform.x = panStart.transformX + (e.touches[0].clientX - panStart.x);
+    imageTransform.y = panStart.transformY + (e.touches[0].clientY - panStart.y);
+    applyImageTransform();
+  } else if (e.touches.length === 2) {
+    const distance = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    if (lastPinchDistance > 0) {
+      imageTransform.scale = Math.max(0.5, Math.min(5, imageTransform.scale * (distance / lastPinchDistance)));
+      applyImageTransform();
+      updateZoomIndicator();
+    }
+    lastPinchDistance = distance;
+  }
+  e.preventDefault();
+}
+
+function zoomWheel(e) {
+  if (!setupMode) return;
+  e.preventDefault();
+  imageTransform.scale = Math.max(0.5, Math.min(5, imageTransform.scale * (e.deltaY > 0 ? 0.9 : 1.1)));
+  applyImageTransform();
+  updateZoomIndicator();
+}
+
+function updateZoomIndicator() {
+  let indicator = document.getElementById("zoomIndicator");
+  if (!indicator) {
+    indicator = document.createElement("div");
+    indicator.id = "zoomIndicator";
+    indicator.className = "zoom-indicator";
+    document.getElementById("frameImageWrap").appendChild(indicator);
+  }
+  indicator.textContent = Math.round(imageTransform.scale * 100) + "%";
+  indicator.style.display = setupMode ? "block" : "none";
+}
+function removeZoomIndicator() {
+  const indicator = document.getElementById("zoomIndicator");
+  if (indicator) indicator.style.display = "none";
+}
+
+function showSetupControls() {
+  let controls = document.getElementById("setupControls");
+  if (!controls) {
+    controls = document.createElement("div");
+    controls.id = "setupControls";
+    controls.className = "setup-mode-controls";
+    controls.innerHTML = `<button id="btnSetupCancel">Cancel</button><button class="primary" id="btnSetupDone">Done & Save</button>`;
+    document.getElementById("frameImageWrap").appendChild(controls);
+    document.getElementById("btnSetupCancel").addEventListener("click", () => exitSetupMode(false));
+    document.getElementById("btnSetupDone").addEventListener("click", () => saveBookmarkWithTransform());
+  }
+  controls.style.display = "flex";
+}
+function hideSetupControls() { const controls = document.getElementById("setupControls"); if (controls) controls.style.display = "none"; }
+
 /* =========================================================================
-   CANVAS ANIMATION HELPERS
+   MAP PICKER
+   ========================================================================= */
+function enterMapPickMode() {
+  mapPickMode = true;
+  const btn = document.getElementById("btnPickOnMap");
+  btn.classList.add("active");
+  btn.textContent = "Click on map...";
+  document.getElementById("frameImageWrap").style.cursor = "crosshair";
+  document.getElementById("frameImageWrap").addEventListener("click", handleMapPick);
+}
+function exitMapPickMode() {
+  mapPickMode = false;
+  const btn = document.getElementById("btnPickOnMap");
+  btn.classList.remove("active");
+  btn.textContent = "Map";
+  document.getElementById("frameImageWrap").style.cursor = "";
+  document.getElementById("frameImageWrap").removeEventListener("click", handleMapPick);
+}
+function handleMapPick(e) {
+  if (!mapPickMode) return;
+  const wrap = document.getElementById("frameImageWrap");
+  const rect = wrap.getBoundingClientRect();
+  const usableLeft = IMG_LEFT, usableRight = rect.width - IMG_RIGHT;
+  const usableTop = IMG_TOP, usableBottom = rect.height - IMG_BOTTOM;
+  const usableW = usableRight - usableLeft, usableH = usableBottom - usableTop;
+  const clickX = e.clientX - rect.left, clickY = e.clientY - rect.top;
+  if (clickX < usableLeft || clickX > usableRight || clickY < usableTop || clickY > usableBottom) return;
+  const xPct = (clickX - usableLeft) / usableW;
+  const yPct = (clickY - usableTop) / usableH;
+  const { north, south, east, west } = RADAR_IMAGE_BOUNDS;
+  const lon = west + xPct * (east - west);
+  const lat = north - yPct * (north - south);
+  setCurrentLocation(lat, lon, `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+  exitMapPickMode();
+  enterSetupMode();
+}
+document.getElementById("btnPickOnMap").addEventListener("click", () => { mapPickMode ? exitMapPickMode() : enterMapPickMode(); });
+
+/* =========================================================================
+   CANVAS ANIMATION
    ========================================================================= */
 function createAnimationCanvas() {
   if (!animationCanvas) {
@@ -954,76 +1515,64 @@ function renderAnimationFrame(index) {
    DATA LOADING
    ========================================================================= */
 async function loadDayIndex(dateStr) {
-  if (!DATA_BASE_URL) {
-    document.getElementById("timeTravelHint").textContent = "No data source configured yet.";
-    currentDayIndex = null;
-    renderScrubber();
-    return;
-  }
+  if (!DATA_BASE_URL) { currentDayIndex = null; renderScrubber(); return; }
   try {
     const res = await fetch(`${DATA_BASE_URL}/index/${dateStr}.json`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     currentDayIndex = await res.json();
-  } catch (err) {
-    console.warn("No index for", dateStr, err);
-    currentDayIndex = { date: dateStr, frames: [] };
-  }
+  } catch (err) { console.warn("No index for", dateStr, err); currentDayIndex = { date: dateStr, frames: [] }; }
+  
+  // Build lookup structures
+  availableTimesSet = new Set((currentDayIndex.frames || []).map(f => f.time));
+  frameTimeMap = {};
+  (currentDayIndex.frames || []).forEach(f => { frameTimeMap[f.time] = f; });
+  
+  updateDayCoverageLabel();
   renderScrubber();
+}
+
+function updateDayCoverageLabel() {
+  const label = document.getElementById("dayCoverageLabel");
+  if (!currentDayIndex || !currentDayIndex.frames || currentDayIndex.frames.length === 0) { label.textContent = "No data available"; return; }
+  const frames = currentDayIndex.frames;
+  const times = frames.map(f => f.time).sort();
+  const first = times[0], last = times[times.length - 1];
+  const expected = 288;
+  if (times.length === expected && first === "00:00" && last === "23:55") { label.textContent = "Full day"; }
+  else { label.textContent = `${times.length}/${expected} frames \u2014 ${first} to ${last}`; }
 }
 
 async function loadDay(dateStr) {
   stopPlayback();
   await loadDayIndex(dateStr);
   if (!currentDayIndex) return;
-
-  if (currentDayIndex.frames && currentDayIndex.frames.length > 0) {
-    // Always use frame-based mode (works for both today and consolidated days)
-    await switchToAnimationMode(currentDayIndex.frames);
-  } else {
-    clearViewer();
-  }
+  if (currentDayIndex.frames && currentDayIndex.frames.length > 0) { await switchToAnimationMode(currentDayIndex.frames); }
+  else { clearViewer(); }
 }
 
 async function switchToAnimationMode(framesMeta) {
   stopPlayback();
   document.getElementById("frameImage").style.display = "none";
   document.getElementById("framePlaceholder").style.display = "none";
-  document.getElementById("currentFrameStatus").textContent = "loading...";
-
+  showMissingOverlay(false);
   try {
     animationFrames = await buildAnimationFromFrames(framesMeta);
     if (animationFrames.length === 0) throw new Error("No frames loaded");
-
     createAnimationCanvas();
     animationCanvas.style.display = "block";
-    animationMode = true;
     animationFrameIndex = 0;
     renderAnimationFrame(0);
-
     const firstTime = animationFrames[0].time;
     currentFrame = { time: firstTime };
     currentFrameIndex = 0;
-    document.getElementById("currentFrameTime").textContent = `${currentDayIndex.date} ${firstTime} UTC`;
-    document.getElementById("currentFrameStatus").textContent = `${animationFrames.length} frames`;
+    document.getElementById("currentFrameTime").textContent = formatDisplayDatetime(currentDayIndex.date, firstTime);
     updateScrubberProgress(firstTime);
-  } catch (err) {
-    console.error("Failed to load animation:", err);
-    clearViewer();
-    document.getElementById("currentFrameStatus").textContent = "load failed";
-  }
-}
-
-function switchToFrameMode() {
-  animationMode = false;
-  animationFrames = [];
-  if (animationCanvas) animationCanvas.style.display = "none";
-  document.getElementById("frameImage").style.display = "none";
-  document.getElementById("framePlaceholder").style.display = "block";
+    updatePlayButtons(false);
+  } catch (err) { console.error("Failed to load animation:", err); clearViewer(); }
 }
 
 function clearViewer() {
   stopPlayback();
-  animationMode = false;
   animationFrames = [];
   animationFrameIndex = 0;
   if (animationCanvas) animationCanvas.style.display = "none";
@@ -1031,36 +1580,62 @@ function clearViewer() {
   document.getElementById("framePlaceholder").style.display = "block";
   document.getElementById("placeholderTime").textContent = "--:--";
   document.getElementById("currentFrameTime").textContent = "No frame selected";
-  document.getElementById("currentFrameStatus").textContent = "\u2014";
+  document.getElementById("dayCoverageLabel").textContent = "";
+  showMissingOverlay(false);
+  updatePlayButtons(false);
 }
 
 /* =========================================================================
-   SEEKING
+   SEEKING (with missing frame handling)
    ========================================================================= */
 async function seekToTime(timeStr) {
-  if (animationMode && animationFrames.length > 0) {
-    const targetIndex = timeToFrameIndex(timeStr);
-    const clampedIndex = Math.max(0, Math.min(targetIndex, animationFrames.length - 1));
-    const actualTime = frameIndexToTime(clampedIndex);
-
-    renderAnimationFrame(clampedIndex);
-    currentFrame = { time: actualTime };
-    currentFrameIndex = clampedIndex;
-    updateScrubberProgress(actualTime);
-    document.getElementById("currentFrameTime").textContent = `${currentDayIndex.date} ${actualTime} UTC`;
-    document.getElementById("currentFrameStatus").textContent = `${animationFrames.length} frames`;
-  } else if (currentDayIndex) {
-    const frames = currentDayIndex.frames || [];
-    if (frames.length > 0) {
-      const targetMinutes = timeToMinutes(timeStr);
-      let closest = frames[0];
-      let minDiff = Infinity;
-      for (const f of frames) {
-        const diff = Math.abs(timeToMinutes(f.time) - targetMinutes);
-        if (diff < minDiff) { minDiff = diff; closest = f; }
+  if (!currentDayIndex) return;
+  
+  const slotLookup = buildFrameSlotLookup(currentDayIndex.frames || []);
+  const targetIndex = timeToFrameIndex(timeStr);
+  const clampedIndex = Math.max(0, Math.min(targetIndex, 287));
+  const slot = slotLookup[clampedIndex];
+  
+  if (slot.isMissing) {
+    // Find nearest available frame
+    const nearest = getNearestAvailableFrame(slotLookup, clampedIndex);
+    if (nearest && animationFrames.length > 0) {
+      // Show the nearest frame with red overlay
+      const nearestTime = nearest.time;
+      const frameEntry = animationFrames.find(f => f.time === nearestTime);
+      if (frameEntry) {
+        const frameIdx = animationFrames.indexOf(frameEntry);
+        renderAnimationFrame(frameIdx);
+        showMissingOverlay(true);
+        currentFrame = { time: timeStr, isMissing: true, actualTime: nearestTime };
+        currentFrameIndex = clampedIndex;
+        updateScrubberProgress(timeStr);
+        document.getElementById("currentFrameTime").textContent = formatDisplayDatetime(currentDayIndex.date, timeStr) + " (missing)";
       }
-      await loadFrameAtTime(closest.time);
+    } else {
+      // No frames at all
+      showMissingOverlay(true);
+      currentFrame = { time: timeStr, isMissing: true };
+      updateScrubberProgress(timeStr);
+      document.getElementById("currentFrameTime").textContent = formatDisplayDatetime(currentDayIndex.date, timeStr) + " (missing)";
     }
+  } else {
+    // Frame exists
+    showMissingOverlay(false);
+    if (animationFrames.length > 0) {
+      const frameEntry = animationFrames.find(f => f.time === timeStr);
+      if (frameEntry) {
+        const frameIdx = animationFrames.indexOf(frameEntry);
+        renderAnimationFrame(frameIdx);
+      }
+    } else if (slot.file) {
+      // Fallback to img tag
+      await loadFrameAtTime(timeStr);
+    }
+    currentFrame = { time: timeStr, isMissing: false };
+    currentFrameIndex = clampedIndex;
+    updateScrubberProgress(timeStr);
+    document.getElementById("currentFrameTime").textContent = formatDisplayDatetime(currentDayIndex.date, timeStr);
   }
 }
 
@@ -1068,81 +1643,102 @@ async function loadFrameAtTime(timeStr) {
   const entry = (currentDayIndex && currentDayIndex.frames || []).find(f => f.time === timeStr);
   const img = document.getElementById("frameImage");
   const placeholder = document.getElementById("framePlaceholder");
-  const statusEl = document.getElementById("currentFrameStatus");
-
   if (!entry) {
-    currentFrame = null;
-    currentFrameIndex = -1;
-    img.style.display = "none";
-    placeholder.style.display = "block";
+    currentFrame = null; currentFrameIndex = -1;
+    img.style.display = "none"; placeholder.style.display = "block";
     document.getElementById("placeholderTime").textContent = timeStr;
     document.getElementById("currentFrameTime").textContent = "No frame for " + timeStr;
-    statusEl.textContent = "unavailable";
-    updateScrubberProgress(timeStr);
+    updateScrubberProgress(timeStr); 
+    showMissingOverlay(true);
     return;
   }
-
+  showMissingOverlay(false);
   currentFrame = entry;
   currentFrameIndex = (currentDayIndex.frames || []).findIndex(f => f.time === timeStr);
   img.src = `${DATA_BASE_URL}/${entry.file.replace(/^data\//, "")}`;
-  img.style.display = "block";
-  placeholder.style.display = "none";
+  img.style.display = "block"; placeholder.style.display = "none";
   if (animationCanvas) animationCanvas.style.display = "none";
-  animationMode = false;
-  document.getElementById("currentFrameTime").textContent = `${currentDayIndex.date} ${entry.time} UTC`;
-  statusEl.textContent = "archived frame";
+  document.getElementById("currentFrameTime").textContent = formatDisplayDatetime(currentDayIndex.date, entry.time);
   updateScrubberProgress(timeStr);
 }
 
 /* =========================================================================
-   SCRUBBER
+   SCRUBBER (with missing frame indicators)
    ========================================================================= */
+let scrubberDragging = false;
+
+function getTimeFromScrubberEvent(e) {
+  const scrubber = document.getElementById("scrubber");
+  const rect = scrubber.getBoundingClientRect();
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  const totalMinutes = Math.floor(pct * 288) * 5;
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2,"0")}:${String(totalMinutes % 60).padStart(2,"0")}`;
+}
+
 function renderScrubber() {
   const scrubber = document.getElementById("scrubber");
   const progress = document.getElementById("scrubberProgress");
   const tooltip = document.getElementById("scrubberTooltip");
   const dateLabel = document.getElementById("timelineDateLabel");
-
   scrubber.querySelectorAll(".tick").forEach(t => t.remove());
-  dateLabel.textContent = currentDayIndex ? currentDayIndex.date : "No day loaded";
-  progress.style.width = "0%";
-  tooltip.classList.remove("active");
+  dateLabel.textContent = currentDayIndex ? formatDisplayDate(currentDayIndex.date) : "No day loaded";
+  progress.style.width = "0%"; tooltip.classList.remove("active");
   if (!currentDayIndex) return;
 
-  const availableTimes = new Set((currentDayIndex.frames || []).map(f => f.time));
+  const slotLookup = buildFrameSlotLookup(currentDayIndex.frames || []);
 
   for (let m = 0; m < 24 * 60; m += 5) {
-    const hh = String(Math.floor(m / 60)).padStart(2, "0");
-    const mm = String(m % 60).padStart(2, "0");
-    const t = `${hh}:${mm}`;
+    const hh = String(Math.floor(m / 60)).padStart(2,"0"), mm = String(m % 60).padStart(2,"0"), t = `${hh}:${mm}`;
     const tick = document.createElement("div");
     tick.className = "tick";
     if (mm === "00") tick.classList.add("hour");
-    if (availableTimes.has(t)) tick.classList.add("available");
+    
+    const slotIndex = Math.floor(m / 5);
+    const slot = slotLookup[slotIndex];
+    
+    if (slot && !slot.isMissing) {
+      tick.classList.add("available");
+    } else {
+      tick.classList.add("missing");
+      tick.style.background = "var(--danger)";
+      tick.style.opacity = "0.35";
+    }
+    
     if (currentFrame && currentFrame.time === t) tick.classList.add("current");
     tick.dataset.time = t;
     scrubber.appendChild(tick);
   }
 
-  scrubber.addEventListener("mousemove", e => {
-    const tick = e.target.closest(".tick");
-    if (tick && tick.dataset.time) {
-      tooltip.textContent = tick.dataset.time;
-      const rect = tick.getBoundingClientRect();
-      const scrubberRect = scrubber.getBoundingClientRect();
-      tooltip.style.left = (rect.left + rect.width / 2 - scrubberRect.left) + "px";
-      tooltip.classList.add("active");
-    } else {
-      tooltip.classList.remove("active");
-    }
+  const handleSeek = (e) => {
+    const timeStr = getTimeFromScrubberEvent(e);
+    seekToTime(timeStr);
+  };
+
+  scrubber.addEventListener("mousedown", (e) => { scrubberDragging = true; handleSeek(e); });
+  window.addEventListener("mousemove", (e) => {
+    if (!scrubberDragging) return;
+    handleSeek(e);
+    const tooltip = document.getElementById("scrubberTooltip");
+    const timeStr = getTimeFromScrubberEvent(e);
+    tooltip.textContent = timeStr;
+    const rect = document.getElementById("scrubber").getBoundingClientRect();
+    tooltip.style.left = (e.clientX - rect.left) + "px";
+    tooltip.classList.add("active");
   });
-  scrubber.addEventListener("mouseleave", () => tooltip.classList.remove("active"));
-  scrubber.addEventListener("click", e => {
-    const tick = e.target.closest(".tick");
-    if (!tick || !tick.dataset.time) return;
-    const timeStr = tick.dataset.time;
-    if (availableTimes.has(timeStr)) seekToTime(timeStr);
+  window.addEventListener("mouseup", () => { scrubberDragging = false; });
+  scrubber.addEventListener("touchstart", (e) => { scrubberDragging = true; handleSeek(e); }, { passive: true });
+  window.addEventListener("touchmove", (e) => { if (!scrubberDragging) return; handleSeek(e); }, { passive: true });
+  window.addEventListener("touchend", () => { scrubberDragging = false; });
+  scrubber.addEventListener("mousemove", (e) => {
+    if (scrubberDragging) return;
+    const timeStr = getTimeFromScrubberEvent(e);
+    tooltip.textContent = timeStr;
+    const rect = scrubber.getBoundingClientRect();
+    tooltip.style.left = (e.clientX - rect.left) + "px";
+    tooltip.classList.add("active");
   });
+  scrubber.addEventListener("mouseleave", () => { if (!scrubberDragging) tooltip.classList.remove("active"); });
 }
 
 function updateScrubberProgress(timeStr) {
@@ -1150,67 +1746,80 @@ function updateScrubberProgress(timeStr) {
   const ticks = document.querySelectorAll("#scrubber .tick");
   if (!ticks.length) { progress.style.width = "0%"; return; }
   let idx = -1;
-  ticks.forEach((t, i) => {
-    if (t.dataset.time === timeStr) idx = i;
-    t.classList.toggle("current", t.dataset.time === timeStr);
-    t.classList.toggle("past", i <= idx && idx >= 0);
-  });
+  ticks.forEach((t, i) => { if (t.dataset.time === timeStr) idx = i; t.classList.toggle("current", t.dataset.time === timeStr); t.classList.toggle("past", i <= idx && idx >= 0); });
   if (idx >= 0) progress.style.width = ((idx + 1) / ticks.length) * 100 + "%";
 }
 
 /* =========================================================================
-   PLAYBACK
+   PLAYBACK (with missing frame handling)
    ========================================================================= */
+function updatePlayButtons(playing) {
+  document.getElementById("btnPlay").style.display = playing ? "none" : "flex";
+  document.getElementById("btnStop").style.display = playing ? "flex" : "none";
+}
+
 function stopPlayback() {
   if (playTimer) { clearInterval(playTimer); playTimer = null; }
   if (animationRequestId) { cancelAnimationFrame(animationRequestId); animationRequestId = null; }
   isPlaying = false;
-  document.getElementById("playIcon").innerHTML = '<path d="M8 5v14l11-7z"/>';
-  document.getElementById("btnPlay").classList.remove("active");
+  updatePlayButtons(false);
 }
 
 function startPlayback() {
   if (!currentDayIndex) return;
-
-  if (animationMode && animationFrames.length > 0) {
-    // Canvas animation mode with speed control
-    isPlaying = true;
+  
+  const slotLookup = buildFrameSlotLookup(currentDayIndex.frames || []);
+  
+  if (animationFrames.length > 0) {
+    isPlaying = true; updatePlayButtons(true);
     const startTimestamp = performance.now() - (animationFrameIndex * FRAME_DURATION_MS / playbackSpeed);
-
-    document.getElementById("playIcon").innerHTML = '<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>';
-    document.getElementById("btnPlay").classList.add("active");
-
+    
     function animateFrame(ts) {
       if (!isPlaying) return;
-      
-      // Apply playback speed to the elapsed time calculation
       const elapsed = (ts - startTimestamp) * playbackSpeed;
-      const totalDuration = animationFrames.length * FRAME_DURATION_MS;
+      const totalDuration = 288 * FRAME_DURATION_MS; // Always 288 slots
       const loopedElapsed = elapsed % totalDuration;
       const frameIndex = Math.floor(loopedElapsed / FRAME_DURATION_MS);
-
+      
       if (frameIndex !== animationFrameIndex) {
-        renderAnimationFrame(frameIndex);
+        const slot = slotLookup[frameIndex];
+        if (slot.isMissing) {
+          // Find nearest available frame to show
+          const nearest = getNearestAvailableFrame(slotLookup, frameIndex);
+          if (nearest) {
+            const frameEntry = animationFrames.find(f => f.time === nearest.time);
+            if (frameEntry) {
+              const idx = animationFrames.indexOf(frameEntry);
+              renderAnimationFrame(idx);
+            }
+          }
+          showMissingOverlay(true);
+        } else {
+          const frameEntry = animationFrames.find(f => f.time === slot.time);
+          if (frameEntry) {
+            const idx = animationFrames.indexOf(frameEntry);
+            renderAnimationFrame(idx);
+          }
+          showMissingOverlay(false);
+        }
+        
         const timeStr = frameIndexToTime(frameIndex);
-        currentFrame = { time: timeStr };
+        currentFrame = { time: timeStr, isMissing: slot.isMissing };
         currentFrameIndex = frameIndex;
         updateScrubberProgress(timeStr);
-        document.getElementById("currentFrameTime").textContent = `${currentDayIndex.date} ${timeStr} UTC`;
+        const label = slot.isMissing ? formatDisplayDatetime(currentDayIndex.date, timeStr) + " (missing)" : formatDisplayDatetime(currentDayIndex.date, timeStr);
+        document.getElementById("currentFrameTime").textContent = label;
       }
       animationRequestId = requestAnimationFrame(animateFrame);
     }
     animationRequestId = requestAnimationFrame(animateFrame);
-
+    
   } else if (currentDayIndex.frames && currentDayIndex.frames.length > 0) {
-    // Frame-by-frame mode with speed control
+    // Frame-by-frame fallback
     const frames = currentDayIndex.frames;
     let idx = currentFrameIndex >= 0 ? currentFrameIndex : 0;
-    isPlaying = true;
-    document.getElementById("playIcon").innerHTML = '<rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/>';
-    document.getElementById("btnPlay").classList.add("active");
-    
-    const baseInterval = 400; // ms at 1× speed
-    const interval = baseInterval / playbackSpeed;
+    isPlaying = true; updatePlayButtons(true);
+    const interval = 400 / playbackSpeed;
     playTimer = setInterval(() => {
       idx = (idx + 1) % frames.length;
       currentFrameIndex = idx;
@@ -1219,61 +1828,39 @@ function startPlayback() {
   }
 }
 
-function togglePlayback() {
-  isPlaying ? stopPlayback() : startPlayback();
-}
+function togglePlayback() { isPlaying ? stopPlayback() : startPlayback(); }
 
 document.getElementById("btnPlay").addEventListener("click", togglePlayback);
-document.getElementById("btnStop").addEventListener("click", () => {
-  stopPlayback();
-  seekToTime("00:00");
-});
+document.getElementById("btnStop").addEventListener("click", () => { stopPlayback(); seekToTime("00:00"); });
 
-// Speed selector — restart playback at new speed if currently playing
-document.getElementById("speedSelect").addEventListener("change", e => {
-  playbackSpeed = parseFloat(e.target.value);
-  if (isPlaying) {
-    stopPlayback();
-    startPlayback();
-  }
+/* =========================================================================
+   SPEED SLIDER
+   ========================================================================= */
+const speedSlider = document.getElementById("speedSlider");
+const speedLabel = document.getElementById("speedLabel");
+function sliderToSpeed(val) { return val <= 10 ? val * 0.1 : val - 9; }
+speedSlider.addEventListener("input", () => {
+  const speed = sliderToSpeed(parseInt(speedSlider.value));
+  playbackSpeed = speed;
+  speedLabel.textContent = speed.toFixed(1).replace(/\.0$/, "") + "\u00d7";
+  if (isPlaying) { stopPlayback(); startPlayback(); }
 });
 
 /* =========================================================================
-   KEYBOARD SHORTCUTS
+   KEYBOARD
    ========================================================================= */
 document.addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.type === "range") return;
   switch (e.key) {
-    case " ":
-      e.preventDefault();
-      togglePlayback();
+    case " ": e.preventDefault(); togglePlayback(); break;
+    case "ArrowLeft": e.preventDefault();
+      seekToTime(frameIndexToTime(Math.max(0, currentFrameIndex - 1)));
       break;
-    case "ArrowLeft":
-      e.preventDefault();
-      if (animationMode && animationFrames.length > 0) {
-        seekToTime(frameIndexToTime(Math.max(0, animationFrameIndex - 1)));
-      } else if (currentDayIndex && currentDayIndex.frames) {
-        const frames = currentDayIndex.frames;
-        if (currentFrameIndex > 0) { currentFrameIndex--; loadFrameAtTime(frames[currentFrameIndex].time); }
-      }
+    case "ArrowRight": e.preventDefault();
+      seekToTime(frameIndexToTime(Math.min(287, currentFrameIndex + 1)));
       break;
-    case "ArrowRight":
-      e.preventDefault();
-      if (animationMode && animationFrames.length > 0) {
-        seekToTime(frameIndexToTime(Math.min(animationFrames.length - 1, animationFrameIndex + 1)));
-      } else if (currentDayIndex && currentDayIndex.frames) {
-        const frames = currentDayIndex.frames;
-        if (currentFrameIndex < frames.length - 1) { currentFrameIndex++; loadFrameAtTime(frames[currentFrameIndex].time); }
-      }
-      break;
-    case "Home":
-      e.preventDefault();
-      seekToTime("00:00");
-      break;
-    case "End":
-      e.preventDefault();
-      seekToTime("23:55");
-      break;
+    case "Home": e.preventDefault(); seekToTime("00:00"); break;
+    case "End": e.preventDefault(); seekToTime("23:55"); break;
   }
 });
 
@@ -1284,13 +1871,7 @@ document.getElementById("btnGoToTime").addEventListener("click", async () => {
   const dateVal = document.getElementById("dateInput").value;
   const timeVal = document.getElementById("timeInput").value;
   if (!dateVal || !timeVal) return;
-
-  // Load the day if needed
-  if (!currentDayIndex || currentDayIndex.date !== dateVal) {
-    await loadDay(dateVal);
-  }
-  
-  // Seek to the requested time (seekToTime handles both animation and frame modes)
+  if (!currentDayIndex || currentDayIndex.date !== dateVal) await loadDay(dateVal);
   await seekToTime(timeVal);
   closeDrawer();
 });
@@ -1301,26 +1882,27 @@ document.getElementById("btnGoToTime").addEventListener("click", async () => {
 function initSettingsPanel() {
   const input = document.getElementById("dataBaseUrlInput");
   input.value = DATA_BASE_URL;
-  input.addEventListener("change", () => {
-    DATA_BASE_URL = input.value.trim().replace(/\/$/, "");
-    const dateVal = document.getElementById("dateInput").value;
-    if (dateVal) loadDay(dateVal);
-  });
+  input.addEventListener("change", () => { DATA_BASE_URL = input.value.trim().replace(/\/$/, ""); saveSetting("dataSourceUrl", DATA_BASE_URL); const dateVal = document.getElementById("dateInput").value; if (dateVal) loadDay(dateVal); });
 }
 
 (function init() {
   setFavicon(DEFAULT_ICON_SVG);
   renderBrandIcon(DEFAULT_ICON_SVG);
   applyTheme();
+  openDatabase().then(async () => {
+    await loadBookmarks();
+    const savedDataSource = await loadSetting("dataSourceUrl", null);
+    if (savedDataSource) { DATA_BASE_URL = savedDataSource; document.getElementById("dataBaseUrlInput").value = DATA_BASE_URL; }
+    const savedTheme = await loadSetting("theme", "system"); themePref = savedTheme; applyTheme();
+    const savedTransform = await loadSetting("imageTransform", null);
+    if (savedTransform) { imageTransform = savedTransform; applyImageTransform(); }
+  });
   renderBookmarks();
   initSettingsPanel();
-
-  // Set today's date and default time
   const today = isoDate(new Date());
   document.getElementById("dateInput").value = today;
   document.getElementById("timeInput").value = "00:00";
   loadDay(today);
-
   initWeatherIconState();
 })();
   </script>
