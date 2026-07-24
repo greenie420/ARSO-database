@@ -2,7 +2,7 @@ name: Fetch ARSO radar frames
 
 on:
   schedule:
-    - cron: "8,23,38,53 * * * *" # Every 15 minutes, but not on full hour to avoid heavy traffic
+    - cron: "10,40 * * * *" # Every half-hour, with 10 min desync
       timezone: "Europe/Ljubljana"
   workflow_dispatch: {}
 
